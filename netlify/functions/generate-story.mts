@@ -1,7 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { Config, Context } from '@netlify/functions'
+import { currentUser, unauthorized } from '../lib/auth.mts'
+import { CREDIT_COSTS, InsufficientCreditsError, grant, spend } from '../lib/credits.mts'
 import { normalizePlan } from '../lib/film.mts'
-import { STORY_PREFIX, storyStore } from '../lib/stores.mts'
+import { saveProject } from '../lib/projects.mts'
 
 const MAX_PROMPT_LENGTH = 1200
 
@@ -88,6 +90,9 @@ const PLAN_TOOL: Anthropic.Tool = {
 }
 
 export default async (req: Request, _context: Context) => {
+  const user = await currentUser()
+  if (!user) return unauthorized('Sign in to generate a film.')
+
   let body: { prompt?: unknown; mode?: unknown }
   try {
     body = await req.json()
@@ -107,6 +112,33 @@ export default async (req: Request, _context: Context) => {
   }
 
   const mode = body.mode === 'advanced' ? 'advanced' : 'basic'
+  const projectId = crypto.randomUUID()
+
+  // Charged up front so a balance cannot be spent twice by parallel requests;
+  // refunded below if the model never delivers a plan.
+  let balance: number
+  try {
+    balance = await spend(
+      user.id,
+      CREDIT_COSTS.story,
+      'story',
+      `Story, script and shot list — ${mode}`,
+      projectId,
+    )
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      return Response.json(
+        {
+          error: `That costs ${error.required} credits and you have ${error.balance}.`,
+          insufficientCredits: true,
+          required: error.required,
+          balance: error.balance,
+        },
+        { status: 402 },
+      )
+    }
+    throw error
+  }
 
   try {
     const anthropic = new Anthropic({
@@ -129,25 +161,35 @@ export default async (req: Request, _context: Context) => {
 
     const toolUse = message.content.find((block) => block.type === 'tool_use')
     if (!toolUse || toolUse.type !== 'tool_use') {
-      return Response.json({ error: 'The story model returned an unusable response.' }, { status: 502 })
+      throw new Error('The story model returned no tool call.')
     }
 
     const project = normalizePlan(toolUse.input as Record<string, unknown>, {
-      id: crypto.randomUUID(),
+      id: projectId,
       prompt,
       mode,
     })
 
     if (!project.shots.length) {
-      return Response.json({ error: 'The story model returned no shots.' }, { status: 502 })
+      throw new Error('The story model returned no shots.')
     }
 
-    await storyStore().setJSON(`${STORY_PREFIX}${project.id}.json`, project)
+    await saveProject(user.id, project)
 
-    return Response.json({ project })
+    return Response.json({ project, balance })
   } catch (error) {
     console.error('generate-story failed:', error)
-    return Response.json({ error: 'Story generation failed. Try again.' }, { status: 502 })
+    const refunded = await grant(
+      user.id,
+      CREDIT_COSTS.story,
+      'refund',
+      'Refund — story generation failed',
+      projectId,
+    )
+    return Response.json(
+      { error: 'Story generation failed. Your credits were refunded.', balance: refunded },
+      { status: 502 },
+    )
   }
 }
 

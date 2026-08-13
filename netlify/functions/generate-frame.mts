@@ -1,9 +1,15 @@
 import type { Config, Context } from '@netlify/functions'
-import { buildFramePrompt, type FilmProject } from '../lib/film.mts'
+import { currentUser, unauthorized } from '../lib/auth.mts'
+import { CREDIT_COSTS, InsufficientCreditsError, grant, spend } from '../lib/credits.mts'
+import { buildFramePrompt } from '../lib/film.mts'
 import { generateImage } from '../lib/images.mts'
-import { FRAME_PREFIX, STORY_PREFIX, frameStore, storyStore } from '../lib/stores.mts'
+import { loadProject, setFrameKey } from '../lib/projects.mts'
+import { FRAME_PREFIX, frameStore } from '../lib/stores.mts'
 
 export default async (req: Request, _context: Context) => {
+  const user = await currentUser()
+  if (!user) return unauthorized('Sign in to generate frames.')
+
   let body: { projectId?: unknown; shot?: unknown; camera?: unknown; lighting?: unknown; mood?: unknown }
   try {
     body = await req.json()
@@ -17,13 +23,12 @@ export default async (req: Request, _context: Context) => {
     return Response.json({ error: 'projectId and shot are required.' }, { status: 400 })
   }
 
-  const stories = storyStore()
-  const project = (await stories.get(`${STORY_PREFIX}${projectId}.json`, {
-    type: 'json',
-  })) as FilmProject | null
-
+  const project = await loadProject(projectId)
   if (!project) {
     return Response.json({ error: 'Unknown project.' }, { status: 404 })
+  }
+  if (project.ownerId !== user.id) {
+    return Response.json({ error: 'That project belongs to another director.' }, { status: 403 })
   }
 
   const shot = project.shots.find((candidate) => candidate.number === shotNumber)
@@ -39,6 +44,25 @@ export default async (req: Request, _context: Context) => {
     mood: typeof body.mood === 'string' && body.mood ? body.mood : shot.mood,
   }
 
+  const ref = `${projectId}:${shotNumber}`
+  let balance: number
+  try {
+    balance = await spend(user.id, CREDIT_COSTS.frame, 'frame', `Still — shot ${shotNumber}`, ref)
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      return Response.json(
+        {
+          error: `That costs ${error.required} credits and you have ${error.balance}.`,
+          insufficientCredits: true,
+          required: error.required,
+          balance: error.balance,
+        },
+        { status: 402 },
+      )
+    }
+    throw error
+  }
+
   try {
     const image = await generateImage(buildFramePrompt(project, directed))
 
@@ -47,14 +71,28 @@ export default async (req: Request, _context: Context) => {
     const key = `shot-${projectId}-${String(shotNumber).padStart(2, '0')}-${nonce}.${image.ext}`
 
     await frameStore().set(`${FRAME_PREFIX}${key}`, image.body)
-    // Written per shot rather than back into the project record, so frames
-    // generating in parallel cannot clobber each other.
-    await stories.set(`${STORY_PREFIX}${projectId}/frames/${shotNumber}`, key)
+    await setFrameKey(projectId, shotNumber, key)
 
-    return Response.json({ shot: shotNumber, key, frameUrl: `/api/frame/${key}`, model: image.model })
+    return Response.json({
+      shot: shotNumber,
+      key,
+      frameUrl: `/api/frame/${key}`,
+      model: image.model,
+      balance,
+    })
   } catch (error) {
     console.error(`generate-frame failed for ${projectId} shot ${shotNumber}:`, error)
-    return Response.json({ error: 'Frame generation failed. Try again.' }, { status: 502 })
+    const refunded = await grant(
+      user.id,
+      CREDIT_COSTS.frame,
+      'refund',
+      `Refund — shot ${shotNumber} failed`,
+      ref,
+    )
+    return Response.json(
+      { error: 'Frame generation failed. Your credits were refunded.', balance: refunded },
+      { status: 502 },
+    )
   }
 }
 

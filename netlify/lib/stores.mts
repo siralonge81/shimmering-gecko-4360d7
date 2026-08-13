@@ -12,5 +12,11 @@ export function frameStore() {
   return getStore({ name: 'cinepay-frames', consistency: 'strong' })
 }
 
+/** Finished video clips, written by the background render function. */
+export function clipStore() {
+  return getStore({ name: 'cinepay-clips', consistency: 'strong' })
+}
+
 export const STORY_PREFIX = 'projects/'
 export const FRAME_PREFIX = 'frames/'
+export const CLIP_PREFIX = 'clips/'
