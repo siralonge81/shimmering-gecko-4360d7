@@ -130,9 +130,11 @@
     content:'';position:absolute;top:9px;left:20px;right:20px;height:1px;background:var(--line);
   }
   .rail-step{display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;flex:1;}
-  .rail-dot{width:19px;height:19px;border-radius:50%;background:var(--ink);border:2px solid var(--gold-dim);z-index:1;}
-  .rail-step:nth-child(1) .rail-dot, .rail-step:nth-child(2) .rail-dot{border-color:var(--gold);background:var(--gold);}
-  .rail-label{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);text-transform:uppercase;letter-spacing:1px;}
+  .rail-dot{width:19px;height:19px;border-radius:50%;background:var(--ink);border:2px solid var(--gold-dim);z-index:1;transition:all .3s;}
+  .rail-step.done .rail-dot{border-color:var(--gold);background:var(--gold);}
+  .rail-step.active .rail-dot{border-color:var(--gold);background:var(--ink);box-shadow:0 0 0 4px rgba(201,162,39,.14);animation:pulse 1.3s ease-in-out infinite;}
+  .rail-label{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);text-transform:uppercase;letter-spacing:1px;transition:color .3s;}
+  .rail-step.done .rail-label, .rail-step.active .rail-label{color:var(--white);}
 
   section.projects{max-width:1080px;margin:90px auto 0;padding:0 24px 100px;}
   .section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;}
@@ -332,6 +334,61 @@
   .tl-track-label{font-family:var(--font-mono);font-size:10px;color:#5c5750;width:60px;flex-shrink:0;}
 
   .back-link{font-family:var(--font-body);font-size:12px;color:var(--white-dim);cursor:pointer;text-decoration:underline;}
+
+  /* ---- generated imagery ---- */
+  .thumb-img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;
+    opacity:0;transition:opacity .55s ease;
+  }
+  .thumb-img.ready{opacity:1;}
+  .thumb-pending::before{
+    content:'';position:absolute;inset:0;z-index:1;
+    background:linear-gradient(100deg, transparent 18%, rgba(246,246,243,.07) 50%, transparent 82%);
+    background-size:240% 100%;animation:sweep 1.5s linear infinite;
+  }
+  @keyframes sweep{from{background-position:130% 0;}to{background-position:-130% 0;}}
+  .card-thumb .status, .shot-num, .mv-thumb .preview-badge{z-index:2;}
+  .card-thumb .status{position:relative;background:rgba(6,7,8,.6);padding:3px 8px;border-radius:3px;}
+  .lb-thumb{position:relative;overflow:hidden;}
+  .fh-bg .thumb-img.ready{opacity:.9;}
+
+  /* ---- composer state ---- */
+  .composer.busy{opacity:.75;pointer-events:none;}
+  .composer .generate:disabled{opacity:.55;cursor:progress;}
+  .gen-status{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:.6px;color:var(--white-dim);
+    min-height:18px;margin:16px 0 0;text-align:center;
+  }
+  .gen-status.error{color:#E08A7E;}
+
+  /* ---- workspace views ---- */
+  .ws-view{display:none;}
+  .ws-view.active{display:block;}
+  .wsitem.muted{opacity:.35;cursor:default;}
+  .wsitem.muted:hover{color:var(--white-dim);}
+  .doc{max-width:660px;}
+  .doc-logline{font-family:var(--font-display);font-weight:700;font-size:26px;line-height:1.15;margin:0 0 16px;}
+  .doc-tags{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px;}
+  .doc-tag{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);border:1px solid var(--line);border-radius:3px;padding:3px 9px;}
+  .doc p{font-size:14px;line-height:1.7;color:var(--white-dim);margin:0 0 16px;}
+  .doc-brief{border-left:2px solid var(--gold-dim);padding:2px 0 2px 14px;font-style:italic;}
+  .script-scene{margin-bottom:30px;}
+  .script-slug{font-family:var(--font-mono);font-size:12px;letter-spacing:1.4px;color:var(--gold);margin:0 0 12px;}
+  .script-action{font-family:var(--font-mono);font-size:13px;line-height:1.75;color:var(--white-dim);white-space:pre-wrap;margin:0 0 18px;}
+  .script-line{max-width:400px;margin:0 auto 14px;}
+  .script-char{font-family:var(--font-mono);font-size:13px;letter-spacing:1.4px;color:var(--white);text-align:center;margin:0;}
+  .script-paren{font-family:var(--font-mono);font-size:12px;color:#5c5750;text-align:center;margin:0;}
+  .script-dialogue{font-family:var(--font-mono);font-size:13px;line-height:1.7;color:var(--white-dim);text-align:center;margin:0;}
+  .shot-card{cursor:pointer;transition:border-color .15s;}
+  .shot-card.selected{border-color:var(--gold);}
+  .shot-meta{font-family:var(--font-mono);font-size:10px;color:#5c5750;margin:6px 0 0;letter-spacing:.4px;}
+  .shot-fail{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;
+    font-family:var(--font-mono);font-size:10px;color:#E08A7E;text-align:center;padding:0 10px;
+  }
+  .ws-empty{max-width:420px;color:var(--white-dim);font-size:14px;line-height:1.7;}
+  .ws-empty h3{margin-bottom:10px;}
+  .tl-clip.pending{opacity:.35;border-style:dashed;}
 </style>
 </head>
 <body>
@@ -369,8 +426,8 @@
     <h1>Turn your idea<br>into a movie.</h1>
     <p class="sub">Describe a scene. Blood of Lagos Studio builds the story, script, storyboard, and shots — then generates the footage. You direct. It executes.</p>
 
-    <div class="composer">
-      <textarea placeholder="Create a 60-second cinematic crime drama scene in Lagos at night. Five childhood friends reunite after 20 years. Rain is falling. One of them is hiding a secret.">Create a 60-second cinematic crime drama scene in Lagos at night. Five childhood friends reunite after 20 years. Rain is falling. One of them is hiding a secret.</textarea>
+    <div class="composer" id="composer">
+      <textarea id="briefInput" placeholder="Create a 60-second cinematic crime drama scene in Lagos at night. Five childhood friends reunite after 20 years. Rain is falling. One of them is hiding a secret.">Create a 60-second cinematic crime drama scene in Lagos at night. Five childhood friends reunite after 20 years. Rain is falling. One of them is hiding a secret.</textarea>
       <div class="composer-row">
         <div class="mode-toggle">
           <button class="active" data-mode="basic">Basic</button>
@@ -379,6 +436,8 @@
         <button class="generate" id="generateBtn">Generate my film →</button>
       </div>
     </div>
+
+    <p class="gen-status" id="genStatus"></p>
 
     <div class="chips">
       <div class="chip">Romantic drama, Lisbon, golden hour</div>
@@ -404,26 +463,26 @@
       <h2>Recent projects</h2>
       <a href="#">View all</a>
     </div>
-    <div class="grid">
-      <div class="card" id="openWorkspaceCard">
-        <div class="card-thumb"><span class="status">7 of 9 shots generated</span></div>
+    <div class="grid" id="projectGrid">
+      <div class="card sample-card" data-slug="rain-over-lagos" data-brief="A 60-second cinematic crime drama in Lagos at night. Five childhood friends reunite after 20 years in a rain-soaked waterfront courtyard. One of them is hiding a secret that surfaces in the last shot.">
+        <div class="card-thumb" data-poster="rain-over-lagos" data-w="460" data-h="260"><span class="status">Sample project</span></div>
         <div class="card-body">
           <p class="card-title">Rain Over Lagos</p>
-          <p class="card-meta">Crime drama · 60s · Edited 2 hours ago</p>
+          <p class="card-meta">Crime drama · 60s · Open to generate</p>
         </div>
       </div>
-      <div class="card">
-        <div class="card-thumb"><span class="status">Draft — script only</span></div>
+      <div class="card sample-card" data-slug="the-last-danfo" data-brief="A 90-second comedy set in Lagos daytime traffic. A danfo bus driver on his last run before retirement argues his way through one final impossible fare.">
+        <div class="card-thumb" data-poster="the-last-danfo" data-w="460" data-h="260"><span class="status">Sample project</span></div>
         <div class="card-body">
           <p class="card-title">The Last Danfo</p>
-          <p class="card-meta">Comedy · 90s · Edited yesterday</p>
+          <p class="card-meta">Comedy · 90s · Open to generate</p>
         </div>
       </div>
-      <div class="card">
-        <div class="card-thumb"><span class="status">Rendering final cut</span></div>
+      <div class="card sample-card" data-slug="harmattan" data-brief="A 120-second family drama at dawn during harmattan. A mother watches her youngest son leave the compound with a suitcase, and neither of them says the thing that matters.">
+        <div class="card-thumb" data-poster="harmattan" data-w="460" data-h="260"><span class="status">Sample project</span></div>
         <div class="card-body">
           <p class="card-title">Harmattan</p>
-          <p class="card-meta">Family drama · 120s · Edited 3 days ago</p>
+          <p class="card-meta">Family drama · 120s · Open to generate</p>
         </div>
       </div>
     </div>
@@ -431,7 +490,7 @@
 </main>
 
 <div class="featured-hero">
-  <div class="fh-bg"></div>
+  <div class="fh-bg" data-poster="featured-hero" data-w="1600" data-h="900"></div>
   <div class="fh-scan"></div>
   <div class="fh-vignette"></div>
   <div class="fh-content">
@@ -468,16 +527,16 @@
   </div>
 
   <div class="leaderboard" id="leaderboard">
-    <div class="lb-card"><div class="lb-rank">1</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Rain Over Lagos</p><p class="lb-votes"><b>4,812</b> votes</p></div></div>
-    <div class="lb-card"><div class="lb-rank">2</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">The Last Danfo</p><p class="lb-votes"><b>3,990</b> votes</p></div></div>
-    <div class="lb-card"><div class="lb-rank">3</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Harmattan</p><p class="lb-votes"><b>3,401</b> votes</p></div></div>
-    <div class="lb-card"><div class="lb-rank">4</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Okada Nights</p><p class="lb-votes"><b>2,977</b> votes</p></div></div>
-    <div class="lb-card"><div class="lb-rank">5</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Blue Hour Market</p><p class="lb-votes"><b>2,640</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">1</div><div class="lb-thumb" data-poster="rain-over-lagos" data-w="340" data-h="200"></div><div class="lb-body"><p class="lb-title">Rain Over Lagos</p><p class="lb-votes"><b>4,812</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">2</div><div class="lb-thumb" data-poster="the-last-danfo" data-w="340" data-h="200"></div><div class="lb-body"><p class="lb-title">The Last Danfo</p><p class="lb-votes"><b>3,990</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">3</div><div class="lb-thumb" data-poster="harmattan" data-w="340" data-h="200"></div><div class="lb-body"><p class="lb-title">Harmattan</p><p class="lb-votes"><b>3,401</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">4</div><div class="lb-thumb" data-poster="okada-nights" data-w="340" data-h="200"></div><div class="lb-body"><p class="lb-title">Okada Nights</p><p class="lb-votes"><b>2,977</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">5</div><div class="lb-thumb" data-poster="blue-hour-market" data-w="340" data-h="200"></div><div class="lb-body"><p class="lb-title">Blue Hour Market</p><p class="lb-votes"><b>2,640</b> votes</p></div></div>
   </div>
 
   <div class="market-grid" id="marketGrid">
     <div class="mv-card" data-genre="crime drama">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="rain-over-lagos" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">Rain Over Lagos</p>
         <p class="mv-creator">by @chiomadirects</p>
@@ -488,7 +547,7 @@
       </div>
     </div>
     <div class="mv-card" data-genre="comedy">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="the-last-danfo" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">The Last Danfo</p>
         <p class="mv-creator">by @femithefilmmaker</p>
@@ -499,7 +558,7 @@
       </div>
     </div>
     <div class="mv-card" data-genre="drama">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="harmattan" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">Harmattan</p>
         <p class="mv-creator">by @amara.films</p>
@@ -510,7 +569,7 @@
       </div>
     </div>
     <div class="mv-card" data-genre="thriller crime">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="okada-nights" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">Okada Nights</p>
         <p class="mv-creator">by @tundemakes</p>
@@ -521,7 +580,7 @@
       </div>
     </div>
     <div class="mv-card" data-genre="scifi">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="blue-hour-market" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">Blue Hour Market</p>
         <p class="mv-creator">by @kelechivisuals</p>
@@ -532,7 +591,7 @@
       </div>
     </div>
     <div class="mv-card" data-genre="romance drama">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="third-mainland" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">Third Mainland</p>
         <p class="mv-creator">by @yemisi.k</p>
@@ -595,93 +654,68 @@
 
 <footer>
   <span>CinePay — prototype build</span>
-  <span>Sample data shown. No AI providers connected yet.</span>
+  <span>Marketplace votes and view counts are sample data. Stories, scripts, and stills are generated live.</span>
 </footer>
 
 <div class="workspace" id="workspace">
   <div class="ws-sidebar">
     <div class="back-link" id="backLink" style="margin:0 20px 16px;">← Back to dashboard</div>
     <div class="wsgroup-label">Project</div>
-    <div class="wsitem">Story</div>
-    <div class="wsitem">Script</div>
-    <div class="wsitem">Characters</div>
-    <div class="wsitem">Locations</div>
+    <div class="wsitem" data-view="story">Story</div>
+    <div class="wsitem" data-view="script">Script</div>
+    <div class="wsitem muted">Characters</div>
+    <div class="wsitem muted">Locations</div>
     <div class="wsgroup-label">Production</div>
-    <div class="wsitem active">Storyboard</div>
-    <div class="wsitem">Shots</div>
-    <div class="wsitem">Assets</div>
-    <div class="wsitem">Audio</div>
+    <div class="wsitem active" data-view="storyboard">Storyboard</div>
+    <div class="wsitem muted">Shots</div>
+    <div class="wsitem muted">Assets</div>
+    <div class="wsitem muted">Audio</div>
     <div class="wsgroup-label">Finish</div>
-    <div class="wsitem">Timeline</div>
-    <div class="wsitem">Export</div>
+    <div class="wsitem muted">Timeline</div>
+    <div class="wsitem muted">Export</div>
   </div>
 
   <div class="ws-main">
     <div class="ws-topbar">
       <div>
-        <div class="proj-name">Rain Over Lagos</div>
-        <div class="proj-scene">SCENE 1 · EXT. WATERFRONT COURTYARD — NIGHT</div>
+        <div class="proj-name" id="wsTitle">No project loaded</div>
+        <div class="proj-scene" id="wsScene">Describe a scene on the dashboard to begin</div>
       </div>
-      <button class="btn">Generate all shots</button>
+      <button class="btn" id="generateAllBtn">Generate all shots</button>
     </div>
 
     <div class="ws-body">
       <div class="ws-canvas">
-        <h3>Storyboard</h3>
-        <div class="storyboard-grid">
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">01</span></div><div class="shot-info"><p class="shot-type">Wide shot</p><p>Five friends arrive separately, rain hammering the courtyard.</p></div></div>
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">02</span></div><div class="shot-info"><p class="shot-type">Medium shot</p><p>David hesitates at the gate, hand on the latch.</p></div></div>
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">03</span></div><div class="shot-info"><p class="shot-type">Close-up</p><p>Amara notices something in David's expression.</p></div></div>
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">04</span></div><div class="shot-info"><p class="shot-type">Over-the-shoulder</p><p>The group reunites, umbrella light flickering.</p></div></div>
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">05</span></div><div class="shot-info"><p class="shot-type">Tracking shot</p><p>Camera follows them across the wet courtyard.</p></div></div>
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">06</span></div><div class="shot-info"><p class="shot-type">Extreme close-up</p><p>Water dripping off a phone screen David is hiding.</p></div></div>
+        <div class="ws-view" id="viewStory">
+          <h3>Story</h3>
+          <div class="doc" id="storyDoc"></div>
+        </div>
+
+        <div class="ws-view" id="viewScript">
+          <h3>Script</h3>
+          <div class="doc" id="scriptDoc"></div>
+        </div>
+
+        <div class="ws-view active" id="viewStoryboard">
+          <h3>Storyboard</h3>
+          <div class="storyboard-grid" id="storyboardGrid"></div>
+          <div class="ws-empty" id="storyboardEmpty">
+            <p>Nothing to board yet. Head back to the dashboard, describe the scene you want, and CinePay will break the story, write the script, and lay out every shot before generating the frames.</p>
+          </div>
         </div>
       </div>
 
       <div class="ws-right">
-        <h4>Shot 03 — controls</h4>
-        <div class="control-row">
-          <label>Camera</label>
-          <div class="pill-group">
-            <div class="pill on">Close-up</div>
-            <div class="pill">Push-in</div>
-            <div class="pill">Handheld</div>
-          </div>
-        </div>
-        <div class="control-row">
-          <label>Lighting</label>
-          <div class="pill-group">
-            <div class="pill on">Neon</div>
-            <div class="pill">Backlit</div>
-            <div class="pill">Rim light</div>
-          </div>
-        </div>
-        <div class="control-row">
-          <label>Mood</label>
-          <div class="pill-group">
-            <div class="pill on">Tense</div>
-            <div class="pill">Mysterious</div>
-          </div>
-        </div>
-        <div class="control-row">
-          <label>Duration</label>
-          <div class="pill-group">
-            <div class="pill">3s</div>
-            <div class="pill on">5s</div>
-            <div class="pill">8s</div>
-          </div>
-        </div>
-        <button class="btn btn-solid" style="width:100%;margin-top:6px;">Generate shot</button>
+        <h4 id="shotControlsTitle">Shot controls</h4>
+        <div id="shotControls"></div>
+        <button class="btn btn-solid" id="generateShotBtn" style="width:100%;margin-top:6px;">Generate shot</button>
       </div>
     </div>
 
     <div class="ws-timeline">
       <div class="tl-track" style="margin-bottom:8px;">
         <div class="tl-track-label">VIDEO</div>
-        <div class="tl-clip">Shot 01</div>
-        <div class="tl-clip">Shot 02</div>
-        <div class="tl-clip">Shot 03</div>
-        <div class="tl-clip" style="opacity:.35;border-style:dashed;">Shot 04</div>
+        <div id="timelineVideo" style="display:flex;gap:4px;"></div>
       </div>
       <div class="tl-track">
         <div class="tl-track-label">AUDIO</div>
@@ -693,60 +727,505 @@
 </div>
 
 <script>
-  const modeButtons = document.querySelectorAll('.mode-toggle button');
-  modeButtons.forEach(b => b.addEventListener('click', () => {
-    modeButtons.forEach(x => x.classList.remove('active'));
-    b.classList.add('active');
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+  const state = { project: null, selected: 1, mode: 'basic', busy: false, overrides: {} };
+
+  function el(tag, className, text){
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  async function requestJSON(url, body){
+    const res = await fetch(url, body ? {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    } : undefined);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  /* ---------- imagery ---------- */
+
+  // Every generated still lives in Netlify Blobs and is resized on the fly by
+  // the Netlify Image CDN, so each surface asks for exactly the size it shows.
+  function cdnUrl(path, w, h){
+    return `/.netlify/images?url=${encodeURIComponent(path)}&w=${w}&h=${h}&fit=cover`;
+  }
+
+  function paintThumb(container, framePath, w, h){
+    let img = container.querySelector('img.thumb-img');
+    if (!img){
+      img = el('img', 'thumb-img');
+      img.alt = '';
+      img.decoding = 'async';
+      container.prepend(img);
+    }
+    img.classList.remove('ready');
+    img.addEventListener('load', () => img.classList.add('ready'), { once: true });
+    img.src = cdnUrl(framePath, w, h);
+  }
+
+  const posterRequests = new Map();
+  function posterUrl(slug){
+    if (!posterRequests.has(slug)){
+      posterRequests.set(slug, requestJSON(`/api/poster/${slug}`).then(data => data.frameUrl));
+    }
+    return posterRequests.get(slug);
+  }
+
+  // Catalogue stills are generated once and cached forever, so they are only
+  // requested when a card actually scrolls into view.
+  const posterObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const node = entry.target;
+      posterObserver.unobserve(node);
+      node.classList.add('thumb-pending');
+      posterUrl(node.dataset.poster)
+        .then(url => paintThumb(node, url, Number(node.dataset.w) || 440, Number(node.dataset.h) || 248))
+        .catch(() => {})
+        .finally(() => node.classList.remove('thumb-pending'));
+    });
+  }, { rootMargin: '250px' });
+
+  $$('[data-poster]').forEach(node => posterObserver.observe(node));
+
+  /* ---------- pipeline rail ---------- */
+
+  const railSteps = $$('.rail-step');
+  function setRail(doneThrough, activeIndex){
+    railSteps.forEach((step, index) => {
+      step.classList.toggle('done', index <= doneThrough);
+      step.classList.toggle('active', index === activeIndex);
+    });
+  }
+  setRail(0, -1);
+
+  const composer = $('#composer');
+  const briefInput = $('#briefInput');
+  const generateBtn = $('#generateBtn');
+  const genStatus = $('#genStatus');
+
+  function setStatus(message, isError){
+    genStatus.textContent = message || '';
+    genStatus.classList.toggle('error', Boolean(isError));
+  }
+
+  /* ---------- workspace rendering ---------- */
+
+  function renderStory(project){
+    const doc = $('#storyDoc');
+    doc.replaceChildren();
+    doc.append(el('p', 'doc-logline', project.logline));
+
+    const tags = el('div', 'doc-tags');
+    project.genres.forEach(genre => tags.append(el('span', 'doc-tag', genre)));
+    tags.append(el('span', 'doc-tag', `${project.durationSeconds}s`));
+    tags.append(el('span', 'doc-tag', `${project.shots.length} shots`));
+    tags.append(el('span', 'doc-tag', project.mode === 'advanced' ? 'Advanced cinematic' : 'Basic'));
+    doc.append(tags);
+
+    if (project.synopsis) doc.append(el('p', null, project.synopsis));
+    doc.append(el('p', 'doc-brief', project.prompt));
+  }
+
+  function renderScript(project){
+    const doc = $('#scriptDoc');
+    doc.replaceChildren();
+
+    project.scenes.forEach(scene => {
+      const block = el('div', 'script-scene');
+      block.append(el('p', 'script-slug', scene.heading));
+      if (scene.action) block.append(el('p', 'script-action', scene.action));
+
+      scene.dialogue.forEach(line => {
+        const group = el('div', 'script-line');
+        group.append(el('p', 'script-char', line.character));
+        if (line.parenthetical) group.append(el('p', 'script-paren', `(${line.parenthetical})`));
+        group.append(el('p', 'script-dialogue', line.line));
+        block.append(group);
+      });
+
+      doc.append(block);
+    });
+  }
+
+  function renderStoryboard(project){
+    const grid = $('#storyboardGrid');
+    grid.replaceChildren();
+
+    project.shots.forEach(shot => {
+      const card = el('div', 'shot-card');
+      card.dataset.shot = shot.number;
+
+      const thumb = el('div', 'shot-thumb');
+      thumb.append(el('span', 'shot-num', String(shot.number).padStart(2, '0')));
+
+      const info = el('div', 'shot-info');
+      info.append(el('p', 'shot-type', shot.shotType));
+      info.append(el('p', null, shot.description));
+      info.append(el('p', 'shot-meta', `${shot.camera} · ${shot.lighting} · ${shot.durationSeconds}s`));
+
+      card.append(thumb, info);
+      card.addEventListener('click', () => selectShot(shot.number));
+      grid.append(card);
+
+      if (shot.frameKey) paintThumb(thumb, `/api/frame/${shot.frameKey}`, 400, 220);
+    });
+
+    $('#storyboardEmpty').style.display = project.shots.length ? 'none' : '';
+  }
+
+  function renderTimeline(){
+    const track = $('#timelineVideo');
+    track.replaceChildren();
+    if (!state.project) return;
+
+    state.project.shots.forEach(shot => {
+      const clip = el('div', 'tl-clip', `Shot ${String(shot.number).padStart(2, '0')}`);
+      clip.style.minWidth = `${Math.max(70, shot.durationSeconds * 16)}px`;
+      if (!shot.frameKey) clip.classList.add('pending');
+      clip.addEventListener('click', () => selectShot(shot.number));
+      track.append(clip);
+    });
+  }
+
+  const LOOK_OPTIONS = {
+    camera: ['Static', 'Slow push-in', 'Handheld track', 'Slow pan'],
+    lighting: ['Neon spill', 'Backlit', 'Rim light', 'Practical lamp'],
+    mood: ['Tense', 'Tender', 'Ominous', 'Hopeful'],
+  };
+
+  function renderControls(){
+    const panel = $('#shotControls');
+    panel.replaceChildren();
+
+    const shot = state.project?.shots.find(candidate => candidate.number === state.selected);
+    if (!shot){
+      $('#shotControlsTitle').textContent = 'Shot controls';
+      panel.append(el('p', 'shot-meta', 'No shot selected.'));
+      return;
+    }
+
+    $('#shotControlsTitle').textContent = `Shot ${String(shot.number).padStart(2, '0')} — controls`;
+
+    Object.keys(LOOK_OPTIONS).forEach(kind => {
+      const row = el('div', 'control-row');
+      row.append(el('label', null, kind[0].toUpperCase() + kind.slice(1)));
+
+      const group = el('div', 'pill-group');
+      const chosen = state.overrides[kind] || shot[kind];
+      const values = [...new Set([shot[kind], ...LOOK_OPTIONS[kind]])].slice(0, 4);
+
+      values.forEach(value => {
+        const pill = el('div', value === chosen ? 'pill on' : 'pill', value);
+        pill.addEventListener('click', () => {
+          state.overrides[kind] = value;
+          renderControls();
+        });
+        group.append(pill);
+      });
+
+      row.append(group);
+      panel.append(row);
+    });
+
+    const durationRow = el('div', 'control-row');
+    durationRow.append(el('label', null, 'Duration'));
+    const durationGroup = el('div', 'pill-group');
+    [...new Set([shot.durationSeconds, 3, 5, 8])].sort((a, b) => a - b).slice(0, 4).forEach(seconds => {
+      const pill = el('div', seconds === shot.durationSeconds ? 'pill on' : 'pill', `${seconds}s`);
+      pill.addEventListener('click', () => {
+        shot.durationSeconds = seconds;
+        renderControls();
+        renderTimeline();
+      });
+      durationGroup.append(pill);
+    });
+    durationRow.append(durationGroup);
+    panel.append(durationRow);
+  }
+
+  function selectShot(number){
+    state.selected = number;
+    state.overrides = {};
+    $$('.shot-card').forEach(card => card.classList.toggle('selected', Number(card.dataset.shot) === number));
+    renderControls();
+  }
+
+  function loadProject(project){
+    state.project = project;
+    state.selected = project.shots[0]?.number || 1;
+    state.overrides = {};
+
+    $('#wsTitle').textContent = project.title;
+    $('#wsScene').textContent = `SCENE 1 · ${project.sceneHeading}`;
+
+    renderStory(project);
+    renderScript(project);
+    renderStoryboard(project);
+    renderTimeline();
+    selectShot(state.selected);
+    rememberProject(project);
+  }
+
+  /* ---------- frame generation ---------- */
+
+  const generateAllBtn = $('#generateAllBtn');
+  const generateShotBtn = $('#generateShotBtn');
+
+  async function generateFrame(number, overrides){
+    const project = state.project;
+    if (!project) return;
+
+    const thumb = $(`.shot-card[data-shot="${number}"] .shot-thumb`);
+    thumb?.classList.add('thumb-pending');
+    thumb?.querySelector('.shot-fail')?.remove();
+
+    try {
+      const data = await requestJSON('/api/generate-frame', {
+        projectId: project.id,
+        shot: number,
+        ...(overrides || {}),
+      });
+
+      const shot = project.shots.find(candidate => candidate.number === number);
+      if (shot) shot.frameKey = data.key;
+      if (thumb) paintThumb(thumb, data.frameUrl, 400, 220);
+      renderTimeline();
+      rememberProject(project);
+    } catch (error) {
+      thumb?.append(el('div', 'shot-fail', 'Frame failed — regenerate this shot'));
+    } finally {
+      thumb?.classList.remove('thumb-pending');
+    }
+  }
+
+  async function generateFrames(force){
+    const project = state.project;
+    if (!project || state.busy) return;
+
+    const queue = project.shots
+      .filter(shot => force || !shot.frameKey)
+      .map(shot => shot.number);
+    if (!queue.length) return;
+
+    const total = queue.length;
+    let done = 0;
+    state.busy = true;
+    generateAllBtn.disabled = true;
+    generateShotBtn.disabled = true;
+    generateAllBtn.textContent = `Generating 0/${total}…`;
+    setStatus(`Generating ${total} storyboard frames…`);
+    setRail(3, 4);
+
+    // Three at a time: fast enough to feel live, gentle on the image model.
+    const workers = Array.from({ length: Math.min(3, total) }, async () => {
+      while (queue.length){
+        await generateFrame(queue.shift());
+        done += 1;
+        generateAllBtn.textContent = `Generating ${done}/${total}…`;
+      }
+    });
+
+    await Promise.all(workers);
+
+    state.busy = false;
+    generateAllBtn.disabled = false;
+    generateShotBtn.disabled = false;
+    generateAllBtn.textContent = 'Generate all shots';
+    setStatus(`“${project.title}” — storyboard complete.`);
+    setRail(4, 5);
+  }
+
+  generateAllBtn.addEventListener('click', () => generateFrames(true));
+  generateShotBtn.addEventListener('click', async () => {
+    if (!state.project || state.busy) return;
+    generateShotBtn.disabled = true;
+    await generateFrame(state.selected, state.overrides);
+    generateShotBtn.disabled = false;
+  });
+
+  /* ---------- recent projects ---------- */
+
+  const RECENTS_KEY = 'cinepay.recents';
+
+  function readRecents(){
+    try { return JSON.parse(localStorage.getItem(RECENTS_KEY)) || []; }
+    catch { return []; }
+  }
+
+  function rememberProject(project){
+    const entry = {
+      id: project.id,
+      title: project.title,
+      genres: project.genres,
+      durationSeconds: project.durationSeconds,
+      shots: project.shots.length,
+      framed: project.shots.filter(shot => shot.frameKey).length,
+      frameKey: project.shots.find(shot => shot.frameKey)?.frameKey || null,
+    };
+
+    const recents = [entry, ...readRecents().filter(item => item.id !== project.id)].slice(0, 6);
+    try { localStorage.setItem(RECENTS_KEY, JSON.stringify(recents)); } catch (error) {}
+    renderRecents();
+  }
+
+  function renderRecents(){
+    const grid = $('#projectGrid');
+    $$('.recent-card', grid).forEach(card => card.remove());
+
+    readRecents().slice().reverse().forEach(entry => {
+      const card = el('div', 'card recent-card');
+
+      const thumb = el('div', 'card-thumb');
+      thumb.append(el('span', 'status', `${entry.framed} of ${entry.shots} shots generated`));
+
+      const body = el('div', 'card-body');
+      body.append(el('p', 'card-title', entry.title));
+      body.append(el('p', 'card-meta', `${(entry.genres || []).join(' · ') || 'Original'} · ${entry.durationSeconds}s`));
+
+      card.append(thumb, body);
+      card.addEventListener('click', () => openProject(entry.id));
+      grid.prepend(card);
+
+      if (entry.frameKey) paintThumb(thumb, `/api/frame/${entry.frameKey}`, 460, 260);
+    });
+  }
+
+  async function openProject(id){
+    setStatus('Loading project…');
+    try {
+      const { project } = await requestJSON(`/api/story/${id}`);
+      loadProject(project);
+      openWorkspace();
+      setStatus(`“${project.title}” loaded.`);
+      generateFrames(false);
+    } catch (error) {
+      setStatus('That project could not be loaded.', true);
+    }
+  }
+
+  /* ---------- the brief ---------- */
+
+  async function runBrief(brief, options){
+    if (state.busy || !brief.trim()) return;
+
+    state.busy = true;
+    composer.classList.add('busy');
+    generateBtn.disabled = true;
+    setStatus('Breaking the story — logline, script, then the shot list…');
+    setRail(0, 1);
+
+    try {
+      const { project } = await requestJSON('/api/generate-story', { prompt: brief.trim(), mode: state.mode });
+      setRail(3, 3);
+      setStatus(`“${project.title}” — ${project.shots.length} shots boarded.`);
+      if (options?.demoSlug){
+        try { localStorage.setItem(`cinepay.demo.${options.demoSlug}`, project.id); } catch (error) {}
+      }
+      state.busy = false;
+      loadProject(project);
+      openWorkspace();
+      generateFrames(false);
+    } catch (error) {
+      setStatus(error.message || 'Story generation failed. Try again.', true);
+      setRail(0, 0);
+      state.busy = false;
+    } finally {
+      composer.classList.remove('busy');
+      generateBtn.disabled = false;
+    }
+  }
+
+  generateBtn.addEventListener('click', () => runBrief(briefInput.value));
+
+  $$('.chip').forEach(chip => chip.addEventListener('click', () => {
+    briefInput.value = chip.textContent.trim();
+    briefInput.focus();
   }));
+
+  $$('.sample-card').forEach(card => card.addEventListener('click', () => {
+    const slug = card.dataset.slug;
+    const cached = localStorage.getItem(`cinepay.demo.${slug}`);
+    briefInput.value = card.dataset.brief;
+    if (cached) { openProject(cached); return; }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    runBrief(card.dataset.brief, { demoSlug: slug });
+  }));
+
+  const modeButtons = $$('.mode-toggle button');
+  modeButtons.forEach(button => button.addEventListener('click', () => {
+    modeButtons.forEach(other => other.classList.remove('active'));
+    button.classList.add('active');
+    state.mode = button.dataset.mode;
+  }));
+
+  /* ---------- navigation ---------- */
 
   function openWorkspace(){
     document.body.classList.add('workspace-mode');
-    document.getElementById('workspace').classList.add('active');
-    window.scrollTo(0,0);
+    $('#workspace').classList.add('active');
+    window.scrollTo(0, 0);
   }
   function closeWorkspace(){
     document.body.classList.remove('workspace-mode');
-    document.getElementById('workspace').classList.remove('active');
+    $('#workspace').classList.remove('active');
   }
-  document.getElementById('openWorkspaceBtn').addEventListener('click', openWorkspace);
-  document.getElementById('openWorkspaceCard').addEventListener('click', openWorkspace);
-  document.getElementById('generateBtn').addEventListener('click', openWorkspace);
-  document.getElementById('backLink').addEventListener('click', closeWorkspace);
 
-  document.querySelectorAll('.vote-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (btn.classList.contains('voted')) return;
-      btn.classList.add('voted');
-      const countEl = btn.querySelector('.vcount');
-      const current = parseInt(btn.dataset.votes.replace(/,/g,''), 10);
-      const next = current + 1;
-      btn.dataset.votes = next;
-      countEl.textContent = next.toLocaleString();
-    });
-  });
-
-  document.getElementById('navMarketplace').addEventListener('click', (e) => {
-    e.preventDefault();
+  $('#openWorkspaceBtn').addEventListener('click', () => {
     closeWorkspace();
-    document.getElementById('marketplaceSection').scrollIntoView({behavior:'smooth'});
+    briefInput.focus();
+    briefInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
-  document.getElementById('navCredits').addEventListener('click', (e) => {
-    e.preventDefault();
+  $('#backLink').addEventListener('click', closeWorkspace);
+
+  $$('.wsitem[data-view]').forEach(item => item.addEventListener('click', () => {
+    $$('.wsitem').forEach(other => other.classList.remove('active'));
+    item.classList.add('active');
+    const target = `view${item.dataset.view[0].toUpperCase()}${item.dataset.view.slice(1)}`;
+    $$('.ws-view').forEach(view => view.classList.toggle('active', view.id === target));
+  }));
+
+  $('#navMarketplace').addEventListener('click', (event) => {
+    event.preventDefault();
     closeWorkspace();
-    document.getElementById('creditsSection').scrollIntoView({behavior:'smooth'});
+    $('#marketplaceSection').scrollIntoView({ behavior: 'smooth' });
+  });
+  $('#navCredits').addEventListener('click', (event) => {
+    event.preventDefault();
+    closeWorkspace();
+    $('#creditsSection').scrollIntoView({ behavior: 'smooth' });
   });
 
-  document.querySelectorAll('.genre-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.genre-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      const genre = tab.dataset.genre;
-      document.querySelectorAll('.mv-card').forEach(card => {
-        const tags = card.dataset.genre || '';
-        card.style.display = (genre === 'all' || tags.includes(genre)) ? '' : 'none';
-      });
+  /* ---------- marketplace ---------- */
+
+  $$('.vote-btn').forEach(button => button.addEventListener('click', () => {
+    if (button.classList.contains('voted')) return;
+    button.classList.add('voted');
+    const next = parseInt(String(button.dataset.votes).replace(/,/g, ''), 10) + 1;
+    button.dataset.votes = next;
+    button.querySelector('.vcount').textContent = next.toLocaleString();
+  }));
+
+  $$('.genre-tab').forEach(tab => tab.addEventListener('click', () => {
+    $$('.genre-tab').forEach(other => other.classList.remove('active'));
+    tab.classList.add('active');
+    const genre = tab.dataset.genre;
+    $$('.mv-card').forEach(card => {
+      const tags = card.dataset.genre || '';
+      card.style.display = (genre === 'all' || tags.includes(genre)) ? '' : 'none';
     });
-  });
+  }));
+
+  renderRecents();
+  renderControls();
 </script>
 
 </body>
