@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CinePay — Turn your idea into a movie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink: #060708;
+    --ink-raised: #0D0F11;
+    --ink-panel: #131619;
+    --line: #24282C;
+    --line-soft: #1A1D20;
+    --gold: #C9A227;
+    --gold-light: #F0D77A;
+    --gold-dim: #8A6D1C;
+    --oxblood: #7A1F2B;
+    --petrol: #1F4B4A;
+    --white: #F6F6F3;
+    --white-dim: #9A9A96;
+    --font-display: 'Big Shoulders Display', sans-serif;
+    --font-mono: 'Courier Prime', monospace;
+    --font-body: 'Manrope', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--white);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;}
+  .rain{
+    position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.05;
+    background-image:repeating-linear-gradient(100deg, transparent 0px, transparent 60px, var(--white) 61px, transparent 63px);
+    background-size:140px 140px;
+    animation:rainfall 6s linear infinite;
+  }
+  @keyframes rainfall{from{background-position:0 0;}to{background-position:-140px 200px;}}
+
+  header{
+    position:relative;z-index:2;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:24px 48px;border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .logomark{flex-shrink:0;display:block;}
+  .wordmark{font-family:var(--font-display);font-weight:900;font-size:22px;letter-spacing:.2px;text-transform:uppercase;}
+  .wordmark span{color:var(--gold);}
+  nav{display:flex;align-items:center;gap:28px;font-size:14px;color:var(--white-dim);}
+  nav a{text-decoration:none;transition:color .15s;}
+  nav a:hover{color:var(--white);}
+  .btn{
+    font-family:var(--font-body);font-weight:600;font-size:14px;
+    padding:10px 20px;border-radius:4px;border:1px solid var(--gold);
+    background:transparent;color:var(--gold);cursor:pointer;transition:all .15s;
+  }
+  .btn:hover{background:var(--gold);color:var(--ink);}
+  .btn-solid{background:var(--gold);color:var(--ink);}
+  .btn-solid:hover{background:#f2984c;}
+
+  main{position:relative;z-index:1;}
+  .hero{
+    max-width:760px;margin:0 auto;padding:100px 24px 60px;text-align:center;
+  }
+  .slug{
+    font-family:var(--font-mono);font-size:13px;letter-spacing:2px;color:var(--gold);
+    margin:0 0 4px;text-transform:uppercase;
+  }
+  .scene{
+    font-family:var(--font-mono);font-size:13px;letter-spacing:1px;color:var(--white-dim);
+    margin:0 0 32px;
+  }
+  h1{
+    font-family:var(--font-display);font-weight:900;
+    font-size:clamp(42px, 7vw, 76px);line-height:0.98;margin:0 0 20px;
+    letter-spacing:.3px;
+  }
+  .sub{
+    font-size:17px;color:var(--white-dim);line-height:1.6;
+    max-width:520px;margin:0 auto 44px;
+  }
+
+  .composer{
+    background:var(--ink-raised);border:1px solid var(--line);border-radius:10px;
+    padding:20px;text-align:left;position:relative;
+    box-shadow:0 30px 80px -30px rgba(0,0,0,.7);
+  }
+  .composer:focus-within{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(232,134,47,.12), 0 30px 80px -30px rgba(0,0,0,.7);}
+  .composer textarea{
+    width:100%;background:transparent;border:none;outline:none;resize:none;
+    color:var(--white);font-family:var(--font-body);font-size:17px;line-height:1.55;
+    min-height:84px;
+  }
+  .composer textarea::placeholder{color:#5c5750;}
+  .composer-row{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:14px;border-top:1px solid var(--line);}
+  .mode-toggle{display:inline-flex;background:var(--ink-panel);border-radius:20px;padding:3px;border:1px solid var(--line);}
+  .mode-toggle button{
+    font-family:var(--font-body);font-size:12px;font-weight:600;padding:7px 14px;border-radius:16px;
+    border:none;background:transparent;color:var(--white-dim);cursor:pointer;transition:all .15s;
+  }
+  .mode-toggle button.active{background:var(--gold);color:var(--ink);}
+  .composer .generate{
+    font-family:var(--font-body);font-weight:700;font-size:14px;
+    padding:11px 22px;border-radius:6px;border:none;background:var(--oxblood);color:var(--white);
+    cursor:pointer;transition:background .15s;
+  }
+  .composer .generate:hover{background:#93242f;}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:20px;}
+  .chip{
+    font-family:var(--font-mono);font-size:12px;color:var(--white-dim);
+    border:1px solid var(--line);border-radius:16px;padding:6px 12px;cursor:pointer;
+    background:var(--ink-raised);transition:all .15s;
+  }
+  .chip:hover{border-color:var(--gold-dim);color:var(--white);}
+
+  .rail{
+    max-width:960px;margin:90px auto 0;padding:0 24px;
+  }
+  .rail-track{
+    display:flex;align-items:center;justify-content:space-between;
+    position:relative;
+  }
+  .rail-track::before{
+    content:'';position:absolute;top:9px;left:20px;right:20px;height:1px;background:var(--line);
+  }
+  .rail-step{display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;flex:1;}
+  .rail-dot{width:19px;height:19px;border-radius:50%;background:var(--ink);border:2px solid var(--gold-dim);z-index:1;}
+  .rail-step:nth-child(1) .rail-dot, .rail-step:nth-child(2) .rail-dot{border-color:var(--gold);background:var(--gold);}
+  .rail-label{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);text-transform:uppercase;letter-spacing:1px;}
+
+  section.projects{max-width:1080px;margin:90px auto 0;padding:0 24px 100px;}
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;}
+  .section-head h2{font-family:var(--font-display);font-weight:700;font-size:24px;margin:0;letter-spacing:.3px;}
+  .section-head a{font-size:13px;color:var(--gold);text-decoration:none;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(230px, 1fr));gap:18px;}
+  .card{
+    background:var(--ink-raised);border:1px solid var(--line);border-radius:8px;overflow:hidden;
+    cursor:pointer;transition:transform .15s, border-color .15s;
+  }
+  .card:hover{transform:translateY(-3px);border-color:var(--gold-dim);}
+  .card-thumb{height:130px;background:linear-gradient(135deg,#1a2229,#0d1114);position:relative;display:flex;align-items:center;justify-content:center;}
+  .card-thumb::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(115deg, transparent 0 18px, rgba(232,134,47,.05) 18px 19px);}
+  .card-thumb .status{font-family:var(--font-mono);font-size:11px;color:var(--gold);z-index:1;}
+  .card-body{padding:14px 16px;}
+  .card-title{font-weight:600;font-size:14px;margin:0 0 4px;}
+  .card-meta{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);margin:0;}
+
+  footer{border-top:1px solid var(--line);padding:28px 48px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--white-dim);position:relative;z-index:1;}
+
+  .featured-hero{
+    position:relative;width:100%;height:520px;overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  }
+  .featured-hero .fh-bg{
+    position:absolute;inset:0;
+    background:linear-gradient(115deg, #1C1013 0%, #0B0D0F 45%, #0E1720 100%);
+    background-size:220% 220%;
+    animation:fhpan 14s ease-in-out infinite;
+  }
+  @keyframes fhpan{
+    0%{background-position:0% 30%;}
+    50%{background-position:100% 70%;}
+    100%{background-position:0% 30%;}
+  }
+  .featured-hero .fh-scan{
+    position:absolute;inset:0;opacity:.06;
+    background-image:repeating-linear-gradient(100deg, transparent 0px, transparent 50px, var(--white) 51px, transparent 53px);
+  }
+  .featured-hero .fh-vignette{
+    position:absolute;inset:0;
+    background:linear-gradient(to top, var(--ink) 5%, rgba(6,7,8,.55) 42%, transparent 78%),
+               linear-gradient(to right, rgba(6,7,8,.75) 0%, transparent 46%);
+  }
+  .fh-content{position:absolute;left:56px;right:56px;bottom:52px;max-width:600px;z-index:2;}
+  .fh-live{
+    display:inline-flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:11px;letter-spacing:1.5px;
+    color:var(--gold-light);text-transform:uppercase;margin-bottom:14px;
+  }
+  .fh-live .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 1.8s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .fh-genres{display:flex;gap:8px;margin-bottom:16px;}
+  .fh-genre-tag{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);border:1px solid var(--line);border-radius:3px;padding:3px 9px;}
+  .fh-content h2{font-family:var(--font-display);font-weight:900;font-size:clamp(36px,5.5vw,58px);line-height:.96;margin:0 0 14px;letter-spacing:.2px;}
+  .fh-content p{font-size:14px;color:var(--white-dim);line-height:1.65;margin:0 0 24px;max-width:480px;}
+  .fh-actions{display:flex;gap:12px;}
+  .fh-watch{
+    display:flex;align-items:center;gap:8px;font-family:var(--font-body);font-weight:700;font-size:14px;
+    background:var(--gold);color:#221A05;border:none;padding:12px 22px;border-radius:5px;cursor:pointer;
+  }
+  .fh-watch:hover{background:var(--gold-light);}
+  .fh-vote{
+    display:flex;align-items:center;gap:8px;font-family:var(--font-body);font-weight:600;font-size:14px;
+    background:rgba(255,255,255,.06);color:var(--white);border:1px solid var(--line);padding:12px 20px;border-radius:5px;cursor:pointer;
+  }
+  .fh-vote:hover{border-color:var(--gold-dim);}
+
+  .genre-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;}
+  .genre-tab{
+    font-family:var(--font-body);font-size:12px;font-weight:600;color:var(--white-dim);
+    background:var(--ink-panel);border:1px solid var(--line);border-radius:16px;padding:7px 15px;cursor:pointer;transition:all .15s;
+  }
+  .genre-tab.active{background:var(--gold);border-color:var(--gold);color:#221A05;}
+  .genre-tab:not(.active):hover{border-color:var(--gold-dim);color:var(--white);}
+
+  .mv-thumb{
+    background-size:220% 220%;animation:fhpan 9s ease-in-out infinite;position:relative;overflow:hidden;
+  }
+  .mv-thumb .preview-badge{
+    position:absolute;bottom:8px;left:8px;display:flex;align-items:center;gap:5px;
+    font-family:var(--font-mono);font-size:10px;color:var(--gold-light);background:rgba(6,7,8,.6);
+    padding:3px 7px;border-radius:3px;letter-spacing:.5px;
+  }
+  .mv-thumb .preview-badge .dot{width:5px;height:5px;border-radius:50%;background:var(--gold);animation:pulse 1.8s ease-in-out infinite;}
+
+  section.market{max-width:1080px;margin:0 auto;padding:56px 24px 70px;}
+  .market-head{margin-bottom:8px;}
+  .market-head .slug{margin-bottom:2px;}
+  .market-head h2{font-family:var(--font-display);font-weight:700;font-size:28px;margin:0 0 8px;letter-spacing:.3px;}
+  .market-head p{color:var(--white-dim);font-size:14px;max-width:560px;line-height:1.6;margin:0 0 32px;}
+
+  .leaderboard{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;margin-bottom:44px;}
+  .lb-card{
+    flex-shrink:0;width:170px;background:var(--ink-raised);border:1px solid var(--line);border-radius:8px;overflow:hidden;position:relative;
+  }
+  .lb-rank{
+    position:absolute;top:8px;left:8px;font-family:var(--font-display);font-weight:900;font-size:22px;color:var(--gold);
+    text-shadow:0 2px 6px rgba(0,0,0,.6);z-index:1;
+  }
+  .lb-thumb{height:100px;background:linear-gradient(135deg,#241419,#0d1114);}
+  .lb-body{padding:10px 12px;}
+  .lb-title{font-size:12px;font-weight:600;margin:0 0 4px;}
+  .lb-votes{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);margin:0;}
+  .lb-votes b{color:var(--gold);}
+
+  .market-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(220px,1fr));gap:16px;}
+  .mv-card{background:var(--ink-raised);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .mv-thumb{height:124px;background:linear-gradient(135deg,#1a2229,#0d1114);position:relative;}
+  .mv-thumb::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(115deg, transparent 0 18px, rgba(232,134,47,.05) 18px 19px);}
+  .mv-body{padding:12px 14px;}
+  .mv-title{font-weight:600;font-size:13px;margin:0 0 3px;}
+  .mv-creator{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);margin:0 0 10px;}
+  .mv-footer{display:flex;align-items:center;justify-content:space-between;}
+  .vote-btn{
+    display:flex;align-items:center;gap:5px;font-family:var(--font-body);font-size:12px;font-weight:600;
+    background:var(--ink-panel);border:1px solid var(--line);color:var(--white-dim);border-radius:14px;
+    padding:5px 12px;cursor:pointer;transition:all .15s;
+  }
+  .vote-btn:hover{border-color:var(--gold-dim);color:var(--white);}
+  .vote-btn.voted{background:var(--gold);border-color:var(--gold);color:var(--ink);}
+  .mv-views{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);}
+
+  .revshare-note{
+    margin-top:36px;background:var(--ink-panel);border:1px solid var(--line);border-left:2px solid var(--oxblood);
+    border-radius:0 8px 8px 0;padding:16px 20px;font-size:13px;color:var(--white-dim);line-height:1.6;
+  }
+  .revshare-note b{color:var(--white);}
+
+  section.credits{max-width:1080px;margin:0 auto;padding:70px 24px;border-top:1px solid var(--line);}
+  .credit-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;}
+  .credit-card{
+    background:var(--ink-raised);border:1px solid var(--line);border-radius:8px;padding:24px 20px;text-align:center;
+    position:relative;
+  }
+  .credit-card.featured{border-color:var(--gold);}
+  .credit-card .badge{
+    position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--ink);
+    font-family:var(--font-mono);font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;letter-spacing:.5px;
+  }
+  .credit-card h3{font-family:var(--font-display);font-weight:700;font-size:22px;margin:0 0 4px;}
+  .credit-card .price{font-size:26px;font-weight:700;margin:8px 0 4px;}
+  .credit-card .per{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);margin:0 0 18px;}
+  .credit-card ul{list-style:none;padding:0;margin:0 0 20px;font-size:12px;color:var(--white-dim);text-align:left;}
+  .credit-card li{padding:5px 0;border-top:1px solid var(--line);}
+  .credit-card li:first-child{border-top:none;}
+
+  .workspace{display:none;height:100vh;}
+  .workspace.active{display:flex;}
+  .hero, .rail, section.projects, footer{transition:opacity .15s;}
+  body.workspace-mode .hero, body.workspace-mode .rail, body.workspace-mode section.projects, body.workspace-mode footer{display:none;}
+
+  .ws-sidebar{width:220px;border-right:1px solid var(--line);padding:20px 0;flex-shrink:0;overflow-y:auto;}
+  .ws-sidebar .wsitem{
+    display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:13px;color:var(--white-dim);cursor:pointer;
+    border-left:2px solid transparent;
+  }
+  .ws-sidebar .wsitem.active{color:var(--white);border-left-color:var(--gold);background:rgba(232,134,47,.06);}
+  .ws-sidebar .wsitem:hover{color:var(--white);}
+  .ws-sidebar .wsgroup-label{font-family:var(--font-mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#5c5750;padding:16px 20px 6px;}
+
+  .ws-main{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .ws-topbar{
+    display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--line);flex-shrink:0;
+  }
+  .ws-topbar .proj-name{font-family:var(--font-display);font-weight:700;font-size:18px;}
+  .ws-topbar .proj-scene{font-family:var(--font-mono);font-size:11px;color:var(--gold);}
+
+  .ws-body{flex:1;display:flex;min-height:0;}
+  .ws-canvas{flex:1;overflow-y:auto;padding:24px;}
+  .ws-canvas h3{font-family:var(--font-display);font-weight:700;font-size:16px;letter-spacing:.3px;margin:0 0 16px;text-transform:uppercase;}
+  .storyboard-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(200px,1fr));gap:14px;}
+  .shot-card{background:var(--ink-raised);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .shot-thumb{height:110px;background:linear-gradient(135deg,#1a2229,#0d1114);position:relative;}
+  .shot-thumb::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(115deg, transparent 0 18px, rgba(232,134,47,.05) 18px 19px);}
+  .shot-num{position:absolute;top:8px;left:8px;font-family:var(--font-mono);font-size:11px;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:3px;color:var(--gold);}
+  .shot-info{padding:10px 12px;}
+  .shot-info p{margin:0;font-size:12px;color:var(--white-dim);line-height:1.5;}
+  .shot-info .shot-type{font-weight:600;color:var(--white);font-size:13px;margin-bottom:2px;}
+
+  .ws-right{width:260px;border-left:1px solid var(--line);padding:20px;flex-shrink:0;overflow-y:auto;}
+  .ws-right h4{font-family:var(--font-mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#5c5750;margin:0 0 12px;}
+  .control-row{margin-bottom:16px;}
+  .control-row label{display:block;font-size:12px;color:var(--white-dim);margin-bottom:6px;}
+  .pill-group{display:flex;flex-wrap:wrap;gap:6px;}
+  .pill{
+    font-size:11px;padding:5px 10px;border-radius:12px;border:1px solid var(--line);
+    background:var(--ink-panel);color:var(--white-dim);cursor:pointer;
+  }
+  .pill.on{background:var(--gold);border-color:var(--gold);color:var(--ink);font-weight:600;}
+
+  .ws-timeline{height:120px;border-top:1px solid var(--line);flex-shrink:0;padding:14px 24px;overflow-x:auto;}
+  .tl-track{display:flex;gap:4px;align-items:center;height:100%;}
+  .tl-clip{
+    height:52px;min-width:70px;background:var(--ink-raised);border:1px solid var(--gold-dim);border-radius:4px;
+    display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;color:var(--white-dim);
+    flex-shrink:0;
+  }
+  .tl-track-label{font-family:var(--font-mono);font-size:10px;color:#5c5750;width:60px;flex-shrink:0;}
+
+  .back-link{font-family:var(--font-body);font-size:12px;color:var(--white-dim);cursor:pointer;text-decoration:underline;}
+</style>
+</head>
+<body>
+
+<div class="rain"></div>
+
+<header>
+  <div class="brand">
+    <svg class="logomark" width="34" height="34" viewBox="0 0 34 34" fill="none">
+      <defs>
+        <linearGradient id="goldGrad" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#F0D77A"/>
+          <stop offset="0.5" stop-color="#C9A227"/>
+          <stop offset="1" stop-color="#8A6D1C"/>
+        </linearGradient>
+      </defs>
+      <circle cx="17" cy="17" r="16" stroke="url(#goldGrad)" stroke-width="1.6"/>
+      <circle cx="17" cy="17" r="12.5" stroke="url(#goldGrad)" stroke-width="0.6" opacity="0.55"/>
+      <path d="M14 11.5L23 17L14 22.5V11.5Z" fill="url(#goldGrad)"/>
+    </svg>
+    <div class="wordmark">Cine<span>Pay</span></div>
+  </div>
+  <nav>
+    <a href="#" id="navMarketplace">Marketplace</a>
+    <a href="#" id="navCredits">Buy credits</a>
+    <a href="#">Sign in</a>
+    <button class="btn btn-solid" id="openWorkspaceBtn">Start free</button>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="slug">FADE IN:</p>
+    <p class="scene">EXT. LAGOS — NIGHT</p>
+    <h1>Turn your idea<br>into a movie.</h1>
+    <p class="sub">Describe a scene. Blood of Lagos Studio builds the story, script, storyboard, and shots — then generates the footage. You direct. It executes.</p>
+
+    <div class="composer">
+      <textarea placeholder="Create a 60-second cinematic crime drama scene in Lagos at night. Five childhood friends reunite after 20 years. Rain is falling. One of them is hiding a secret.">Create a 60-second cinematic crime drama scene in Lagos at night. Five childhood friends reunite after 20 years. Rain is falling. One of them is hiding a secret.</textarea>
+      <div class="composer-row">
+        <div class="mode-toggle">
+          <button class="active" data-mode="basic">Basic</button>
+          <button data-mode="advanced">Advanced cinematic</button>
+        </div>
+        <button class="generate" id="generateBtn">Generate my film →</button>
+      </div>
+    </div>
+
+    <div class="chips">
+      <div class="chip">Romantic drama, Lisbon, golden hour</div>
+      <div class="chip">Sci-fi chase, Neo-Tokyo, neon rain</div>
+      <div class="chip">Quiet family reunion, harmattan dust</div>
+    </div>
+  </section>
+
+  <section class="rail">
+    <div class="rail-track">
+      <div class="rail-step"><div class="rail-dot"></div><div class="rail-label">Idea</div></div>
+      <div class="rail-step"><div class="rail-dot"></div><div class="rail-label">Story</div></div>
+      <div class="rail-step"><div class="rail-dot"></div><div class="rail-label">Script</div></div>
+      <div class="rail-step"><div class="rail-dot"></div><div class="rail-label">Storyboard</div></div>
+      <div class="rail-step"><div class="rail-dot"></div><div class="rail-label">Generate</div></div>
+      <div class="rail-step"><div class="rail-dot"></div><div class="rail-label">Edit</div></div>
+      <div class="rail-step"><div class="rail-dot"></div><div class="rail-label">Export</div></div>
+    </div>
+  </section>
+
+  <section class="projects">
+    <div class="section-head">
+      <h2>Recent projects</h2>
+      <a href="#">View all</a>
+    </div>
+    <div class="grid">
+      <div class="card" id="openWorkspaceCard">
+        <div class="card-thumb"><span class="status">7 of 9 shots generated</span></div>
+        <div class="card-body">
+          <p class="card-title">Rain Over Lagos</p>
+          <p class="card-meta">Crime drama · 60s · Edited 2 hours ago</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-thumb"><span class="status">Draft — script only</span></div>
+        <div class="card-body">
+          <p class="card-title">The Last Danfo</p>
+          <p class="card-meta">Comedy · 90s · Edited yesterday</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-thumb"><span class="status">Rendering final cut</span></div>
+        <div class="card-body">
+          <p class="card-title">Harmattan</p>
+          <p class="card-meta">Family drama · 120s · Edited 3 days ago</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="featured-hero">
+  <div class="fh-bg"></div>
+  <div class="fh-scan"></div>
+  <div class="fh-vignette"></div>
+  <div class="fh-content">
+    <div class="fh-live"><span class="dot"></span>Playing preview</div>
+    <div class="fh-genres">
+      <span class="fh-genre-tag">Crime</span>
+      <span class="fh-genre-tag">Drama</span>
+      <span class="fh-genre-tag">Rank #1 this week</span>
+    </div>
+    <h2>Rain Over Lagos</h2>
+    <p>Five childhood friends reunite after 20 years on a rain-soaked Lagos night — one of them is hiding a secret that's about to surface. Generated entirely on CinePay.</p>
+    <div class="fh-actions">
+      <button class="fh-watch"><span>&#9654;</span> Watch</button>
+      <button class="fh-vote"><span>&#9650;</span> Vote — 4,812</button>
+    </div>
+  </div>
+</div>
+
+<section class="market" id="marketplaceSection">
+  <div class="market-head">
+    <p class="slug">NOW SCREENING</p>
+    <h2>CinePay Selects</h2>
+    <p>Films made on CinePay, submitted by their creators for monetization. Viewers vote by watching and tapping the vote button. This week's top 10 share a prize pool — paid in cash or crypto — on top of their ongoing streaming revenue share.</p>
+  </div>
+
+  <div class="genre-tabs" id="genreTabs">
+    <div class="genre-tab active" data-genre="all">All</div>
+    <div class="genre-tab" data-genre="crime">Crime</div>
+    <div class="genre-tab" data-genre="drama">Drama</div>
+    <div class="genre-tab" data-genre="thriller">Thriller</div>
+    <div class="genre-tab" data-genre="scifi">Sci-fi</div>
+    <div class="genre-tab" data-genre="comedy">Comedy</div>
+    <div class="genre-tab" data-genre="romance">Romance</div>
+  </div>
+
+  <div class="leaderboard" id="leaderboard">
+    <div class="lb-card"><div class="lb-rank">1</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Rain Over Lagos</p><p class="lb-votes"><b>4,812</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">2</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">The Last Danfo</p><p class="lb-votes"><b>3,990</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">3</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Harmattan</p><p class="lb-votes"><b>3,401</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">4</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Okada Nights</p><p class="lb-votes"><b>2,977</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">5</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Blue Hour Market</p><p class="lb-votes"><b>2,640</b> votes</p></div></div>
+  </div>
+
+  <div class="market-grid" id="marketGrid">
+    <div class="mv-card" data-genre="crime drama">
+      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-body">
+        <p class="mv-title">Rain Over Lagos</p>
+        <p class="mv-creator">by @chiomadirects</p>
+        <div class="mv-footer">
+          <button class="vote-btn voted" data-votes="4812"><span>&#9650;</span> <span class="vcount">4,812</span></button>
+          <span class="mv-views">61.2k views</span>
+        </div>
+      </div>
+    </div>
+    <div class="mv-card" data-genre="comedy">
+      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-body">
+        <p class="mv-title">The Last Danfo</p>
+        <p class="mv-creator">by @femithefilmmaker</p>
+        <div class="mv-footer">
+          <button class="vote-btn" data-votes="3990"><span>&#9650;</span> <span class="vcount">3,990</span></button>
+          <span class="mv-views">48.4k views</span>
+        </div>
+      </div>
+    </div>
+    <div class="mv-card" data-genre="drama">
+      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-body">
+        <p class="mv-title">Harmattan</p>
+        <p class="mv-creator">by @amara.films</p>
+        <div class="mv-footer">
+          <button class="vote-btn" data-votes="3401"><span>&#9650;</span> <span class="vcount">3,401</span></button>
+          <span class="mv-views">39.7k views</span>
+        </div>
+      </div>
+    </div>
+    <div class="mv-card" data-genre="thriller crime">
+      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-body">
+        <p class="mv-title">Okada Nights</p>
+        <p class="mv-creator">by @tundemakes</p>
+        <div class="mv-footer">
+          <button class="vote-btn" data-votes="2977"><span>&#9650;</span> <span class="vcount">2,977</span></button>
+          <span class="mv-views">31.5k views</span>
+        </div>
+      </div>
+    </div>
+    <div class="mv-card" data-genre="scifi">
+      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-body">
+        <p class="mv-title">Blue Hour Market</p>
+        <p class="mv-creator">by @kelechivisuals</p>
+        <div class="mv-footer">
+          <button class="vote-btn" data-votes="2640"><span>&#9650;</span> <span class="vcount">2,640</span></button>
+          <span class="mv-views">27.9k views</span>
+        </div>
+      </div>
+    </div>
+    <div class="mv-card" data-genre="romance drama">
+      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-body">
+        <p class="mv-title">Third Mainland</p>
+        <p class="mv-creator">by @yemisi.k</p>
+        <div class="mv-footer">
+          <button class="vote-btn" data-votes="2214"><span>&#9650;</span> <span class="vcount">2,214</span></button>
+          <span class="mv-views">22.1k views</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="revshare-note">
+    <b>How payouts work (draft model — pending legal review):</b> creators earn a revenue share from views and CinePay Credit spend on their film, paid out via direct deposit or crypto wallet, on a schedule similar to platforms like YouTube or Spotify. The weekly Top 10 additionally split a prize pool. Voting is free for every registered viewer — no purchase or credit spend is required to vote or win, so this qualifies as a skill/popularity contest rather than a paid lottery. Official contest rules, eligibility, and prize disclosures will be finalized with legal counsel before this goes live.
+  </div>
+</section>
+
+<section class="credits" id="creditsSection">
+  <div class="market-head">
+    <p class="slug">FUEL YOUR PRODUCTION</p>
+    <h2>Buy CinePay credits</h2>
+    <p>Every generation — image, video, voice, or music — spends credits. Buy what you need, or subscribe monthly for a standing allowance. No surprise charges: you'll always see the credit cost before you generate.</p>
+  </div>
+  <div class="credit-grid">
+    <div class="credit-card">
+      <h3>Starter</h3>
+      <div class="price">$19</div>
+      <p class="per">one-time · 500 credits</p>
+      <ul>
+        <li>~8 video shots</li>
+        <li>Unlimited script drafts</li>
+        <li>Standard render queue</li>
+      </ul>
+      <button class="btn" style="width:100%;">Buy credits</button>
+    </div>
+    <div class="credit-card featured">
+      <div class="badge">MOST POPULAR</div>
+      <h3>Creator</h3>
+      <div class="price">$49<span style="font-size:14px;color:var(--white-dim);">/mo</span></div>
+      <p class="per">1,500 credits monthly</p>
+      <ul>
+        <li>~25 video shots / month</li>
+        <li>Priority render queue</li>
+        <li>Submit films for monetization</li>
+      </ul>
+      <button class="btn btn-solid" style="width:100%;">Subscribe</button>
+    </div>
+    <div class="credit-card">
+      <h3>Studio</h3>
+      <div class="price">$149<span style="font-size:14px;color:var(--white-dim);">/mo</span></div>
+      <p class="per">5,000 credits monthly</p>
+      <ul>
+        <li>~85 video shots / month</li>
+        <li>Highest-priority render queue</li>
+        <li>Reduced revenue-share fee on payouts</li>
+      </ul>
+      <button class="btn" style="width:100%;">Subscribe</button>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>CinePay — prototype build</span>
+  <span>Sample data shown. No AI providers connected yet.</span>
+</footer>
+
+<div class="workspace" id="workspace">
+  <div class="ws-sidebar">
+    <div class="back-link" id="backLink" style="margin:0 20px 16px;">← Back to dashboard</div>
+    <div class="wsgroup-label">Project</div>
+    <div class="wsitem">Story</div>
+    <div class="wsitem">Script</div>
+    <div class="wsitem">Characters</div>
+    <div class="wsitem">Locations</div>
+    <div class="wsgroup-label">Production</div>
+    <div class="wsitem active">Storyboard</div>
+    <div class="wsitem">Shots</div>
+    <div class="wsitem">Assets</div>
+    <div class="wsitem">Audio</div>
+    <div class="wsgroup-label">Finish</div>
+    <div class="wsitem">Timeline</div>
+    <div class="wsitem">Export</div>
+  </div>
+
+  <div class="ws-main">
+    <div class="ws-topbar">
+      <div>
+        <div class="proj-name">Rain Over Lagos</div>
+        <div class="proj-scene">SCENE 1 · EXT. WATERFRONT COURTYARD — NIGHT</div>
+      </div>
+      <button class="btn">Generate all shots</button>
+    </div>
+
+    <div class="ws-body">
+      <div class="ws-canvas">
+        <h3>Storyboard</h3>
+        <div class="storyboard-grid">
+          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">01</span></div><div class="shot-info"><p class="shot-type">Wide shot</p><p>Five friends arrive separately, rain hammering the courtyard.</p></div></div>
+          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">02</span></div><div class="shot-info"><p class="shot-type">Medium shot</p><p>David hesitates at the gate, hand on the latch.</p></div></div>
+          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">03</span></div><div class="shot-info"><p class="shot-type">Close-up</p><p>Amara notices something in David's expression.</p></div></div>
+          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">04</span></div><div class="shot-info"><p class="shot-type">Over-the-shoulder</p><p>The group reunites, umbrella light flickering.</p></div></div>
+          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">05</span></div><div class="shot-info"><p class="shot-type">Tracking shot</p><p>Camera follows them across the wet courtyard.</p></div></div>
+          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">06</span></div><div class="shot-info"><p class="shot-type">Extreme close-up</p><p>Water dripping off a phone screen David is hiding.</p></div></div>
+        </div>
+      </div>
+
+      <div class="ws-right">
+        <h4>Shot 03 — controls</h4>
+        <div class="control-row">
+          <label>Camera</label>
+          <div class="pill-group">
+            <div class="pill on">Close-up</div>
+            <div class="pill">Push-in</div>
+            <div class="pill">Handheld</div>
+          </div>
+        </div>
+        <div class="control-row">
+          <label>Lighting</label>
+          <div class="pill-group">
+            <div class="pill on">Neon</div>
+            <div class="pill">Backlit</div>
+            <div class="pill">Rim light</div>
+          </div>
+        </div>
+        <div class="control-row">
+          <label>Mood</label>
+          <div class="pill-group">
+            <div class="pill on">Tense</div>
+            <div class="pill">Mysterious</div>
+          </div>
+        </div>
+        <div class="control-row">
+          <label>Duration</label>
+          <div class="pill-group">
+            <div class="pill">3s</div>
+            <div class="pill on">5s</div>
+            <div class="pill">8s</div>
+          </div>
+        </div>
+        <button class="btn btn-solid" style="width:100%;margin-top:6px;">Generate shot</button>
+      </div>
+    </div>
+
+    <div class="ws-timeline">
+      <div class="tl-track" style="margin-bottom:8px;">
+        <div class="tl-track-label">VIDEO</div>
+        <div class="tl-clip">Shot 01</div>
+        <div class="tl-clip">Shot 02</div>
+        <div class="tl-clip">Shot 03</div>
+        <div class="tl-clip" style="opacity:.35;border-style:dashed;">Shot 04</div>
+      </div>
+      <div class="tl-track">
+        <div class="tl-track-label">AUDIO</div>
+        <div class="tl-clip" style="border-color:var(--petrol);">Rain SFX</div>
+        <div class="tl-clip" style="border-color:var(--petrol);min-width:220px;">Score — dark cinematic</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const modeButtons = document.querySelectorAll('.mode-toggle button');
+  modeButtons.forEach(b => b.addEventListener('click', () => {
+    modeButtons.forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+  }));
+
+  function openWorkspace(){
+    document.body.classList.add('workspace-mode');
+    document.getElementById('workspace').classList.add('active');
+    window.scrollTo(0,0);
+  }
+  function closeWorkspace(){
+    document.body.classList.remove('workspace-mode');
+    document.getElementById('workspace').classList.remove('active');
+  }
+  document.getElementById('openWorkspaceBtn').addEventListener('click', openWorkspace);
+  document.getElementById('openWorkspaceCard').addEventListener('click', openWorkspace);
+  document.getElementById('generateBtn').addEventListener('click', openWorkspace);
+  document.getElementById('backLink').addEventListener('click', closeWorkspace);
+
+  document.querySelectorAll('.vote-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('voted')) return;
+      btn.classList.add('voted');
+      const countEl = btn.querySelector('.vcount');
+      const current = parseInt(btn.dataset.votes.replace(/,/g,''), 10);
+      const next = current + 1;
+      btn.dataset.votes = next;
+      countEl.textContent = next.toLocaleString();
+    });
+  });
+
+  document.getElementById('navMarketplace').addEventListener('click', (e) => {
+    e.preventDefault();
+    closeWorkspace();
+    document.getElementById('marketplaceSection').scrollIntoView({behavior:'smooth'});
+  });
+  document.getElementById('navCredits').addEventListener('click', (e) => {
+    e.preventDefault();
+    closeWorkspace();
+    document.getElementById('creditsSection').scrollIntoView({behavior:'smooth'});
+  });
+
+  document.querySelectorAll('.genre-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.genre-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const genre = tab.dataset.genre;
+      document.querySelectorAll('.mv-card').forEach(card => {
+        const tags = card.dataset.genre || '';
+        card.style.display = (genre === 'all' || tags.includes(genre)) ? '' : 'none';
+      });
+    });
+  });
+</script>
+
+</body>
+</html>
