@@ -12,7 +12,11 @@ export default async (_req: Request, _context: Context) => {
   const user = await currentUser()
 
   if (!user) {
-    return Response.json({ user: null, costs: CREDIT_COSTS })
+    return Response.json({
+      user: null,
+      costs: CREDIT_COSTS,
+      paymentsConfigured: Boolean(Netlify.env.get('STRIPE_SECRET_KEY')),
+    })
   }
 
   const [balance, ledger, projects] = await Promise.all([
@@ -27,6 +31,7 @@ export default async (_req: Request, _context: Context) => {
     costs: CREDIT_COSTS,
     ledger,
     projects,
+    paymentsConfigured: Boolean(Netlify.env.get('STRIPE_SECRET_KEY')),
   })
 }
 

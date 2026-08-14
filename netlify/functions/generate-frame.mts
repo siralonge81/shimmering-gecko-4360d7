@@ -3,12 +3,16 @@ import { currentUser, unauthorized } from '../lib/auth.mts'
 import { CREDIT_COSTS, InsufficientCreditsError, grant, spend } from '../lib/credits.mts'
 import { buildFramePrompt } from '../lib/film.mts'
 import { generateImage } from '../lib/images.mts'
+import { checkRateLimit, sweepRateBuckets } from '../lib/rate-limit.mts'
 import { loadProject, setFrameKey } from '../lib/projects.mts'
 import { FRAME_PREFIX, frameStore } from '../lib/stores.mts'
 
 export default async (req: Request, _context: Context) => {
   const user = await currentUser()
   if (!user) return unauthorized('Sign in to generate frames.')
+
+  const limited = await checkRateLimit(req, 'frame', user.identityId)
+  if (limited) return limited
 
   let body: { projectId?: unknown; shot?: unknown; camera?: unknown; lighting?: unknown; mood?: unknown }
   try {

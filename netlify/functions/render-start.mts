@@ -6,6 +6,7 @@ import { currentUser, unauthorized } from '../lib/auth.mts'
 import { CREDIT_COSTS, InsufficientCreditsError, grant, spend } from '../lib/credits.mts'
 import { loadProject } from '../lib/projects.mts'
 import { activeProvider } from '../lib/video.mts'
+import { checkRateLimit, sweepRateBuckets } from '../lib/rate-limit.mts'
 
 /**
  * Queues a clip. The provider call itself happens in the background function,
@@ -14,6 +15,10 @@ import { activeProvider } from '../lib/video.mts'
 export default async (req: Request, context: Context) => {
   const user = await currentUser()
   if (!user) return unauthorized('Sign in to render video.')
+
+  const limited = await checkRateLimit(req, 'video', user.identityId)
+  if (limited) return limited
+  void sweepRateBuckets()
 
   const projectId = String(context.params.projectId ?? '')
   let body: { shot?: unknown }

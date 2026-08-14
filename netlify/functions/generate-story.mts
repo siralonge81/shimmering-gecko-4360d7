@@ -3,6 +3,7 @@ import type { Config, Context } from '@netlify/functions'
 import { currentUser, unauthorized } from '../lib/auth.mts'
 import { CREDIT_COSTS, InsufficientCreditsError, grant, spend } from '../lib/credits.mts'
 import { normalizePlan } from '../lib/film.mts'
+import { checkRateLimit, sweepRateBuckets } from '../lib/rate-limit.mts'
 import { saveProject } from '../lib/projects.mts'
 
 const MAX_PROMPT_LENGTH = 1200
@@ -92,6 +93,12 @@ const PLAN_TOOL: Anthropic.Tool = {
 export default async (req: Request, _context: Context) => {
   const user = await currentUser()
   if (!user) return unauthorized('Sign in to generate a film.')
+
+  // Meter before charging: an abusive caller should be refused before any
+  // model call or ledger write.
+  const limited = await checkRateLimit(req, 'story', user.identityId)
+  if (limited) return limited
+  void sweepRateBuckets()
 
   let body: { prompt?: unknown; mode?: unknown }
   try {

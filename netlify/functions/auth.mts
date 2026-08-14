@@ -17,9 +17,14 @@ export default async (req: Request, context: Context) => {
       return Response.json({
         autoconfirm: Boolean(settings.autoconfirm),
         disableSignup: Boolean(settings.disableSignup),
+        providers: settings.providers,
       })
     } catch {
-      return Response.json({ autoconfirm: false, disableSignup: false })
+      return Response.json({
+        autoconfirm: false,
+        disableSignup: false,
+        providers: { google: false, github: false, gitlab: false, bitbucket: false, facebook: false, email: true },
+      })
     }
   }
 

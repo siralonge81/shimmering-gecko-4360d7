@@ -140,6 +140,33 @@ export const creditLedger = pgTable(
 )
 
 /**
+ * Per-user, per-action rate-limit counters. A row is touched on every
+ * generation request; the window is short and the table is trimmed as old
+ * buckets age out, so it stays small. Lives in the database so every function
+ * instance sees the same count.
+ */
+export const rateBuckets = pgTable(
+  'rate_buckets',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** The Identity user id, so anonymous abuse is also bounded by IP. */
+    identityId: text('identity_id'),
+    ip: text(),
+    /** story | frame | video — which metered endpoint this counts. */
+    action: text().notNull(),
+    /** Truncated to the second; one row per (key, action, window). */
+    windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+    count: integer().notNull().default(1),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('rate_buckets_key_window_key')
+      .on(table.identityId, table.ip, table.action, table.windowStart),
+    index('rate_buckets_window_idx').on(table.windowStart),
+  ],
+)
+
+/**
  * Video renders run on an external provider and outlive a request, so the job
  * is a row that a background function advances and the browser polls.
  */

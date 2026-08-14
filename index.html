@@ -468,7 +468,55 @@
   .clip-player{width:100%;border:1px solid var(--line);border-radius:6px;margin-top:12px;display:block;background:#000;}
   .tl-clip.rendered{border-color:var(--gold);color:var(--white);cursor:pointer;}
   .tl-clip.rendering{border-style:dashed;color:var(--gold-light);animation:pulse 1.6s ease-in-out infinite;}
-</style>
+
+  /* ---- oauth + recovery ---- */
+  .auth-divider{
+    display:flex;align-items:center;gap:10px;margin:16px 0 12px;
+    font-family:var(--font-mono);font-size:10px;color:#5c5750;letter-spacing:.6px;
+  }
+  .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--line);}
+  .oauth-row{display:flex;flex-direction:column;gap:8px;}
+  .oauth-btn{
+    display:flex;align-items:center;justify-content:center;gap:9px;
+    background:var(--ink-raised);border:1px solid var(--line);color:var(--white);
+    font-family:var(--font-body);font-size:13px;font-weight:600;padding:10px;border-radius:4px;cursor:pointer;transition:all .15s;
+  }
+  .oauth-btn:hover{border-color:var(--gold-dim);background:var(--ink-panel);}
+  .oauth-btn svg{width:16px;height:16px;flex-shrink:0;}
+  .auth-link{
+    display:block;text-align:center;margin-top:12px;font-family:var(--font-mono);font-size:11px;
+    color:var(--white-dim);cursor:pointer;text-decoration:underline;
+  }
+  .auth-link:hover{color:var(--gold-light);}
+
+  /* ---- account modal ---- */
+  .acct-section{border-top:1px solid var(--line);padding-top:16px;margin-top:18px;}
+  .acct-section h4{
+    font-family:var(--font-mono);font-size:10px;letter-spacing:1px;color:#5c5750;
+    text-transform:uppercase;margin:0 0 10px;
+  }
+  .acct-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;font-size:13px;}
+  .acct-row .label{color:var(--white-dim);}
+  .acct-row .value{font-family:var(--font-mono);font-size:12px;color:var(--white);}
+  .acct-ledger{font-family:var(--font-mono);font-size:11px;line-height:1.8;color:var(--white-dim);max-height:180px;overflow:auto;margin-top:6px;}
+  .acct-ledger .delta-pos{color:var(--gold-light);}
+  .acct-ledger .delta-neg{color:#E08A7E;}
+  .acct-projects{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+  .acct-project{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    background:var(--ink-raised);border:1px solid var(--line);border-radius:5px;padding:8px 10px;font-size:12px;
+  }
+  .acct-project .ptitle{color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .acct-project .pdel{
+    font-family:var(--font-mono);font-size:10px;color:#E08A7E;background:none;border:none;cursor:pointer;
+  }
+  .acct-project .pdel:hover{color:#f2984c;}
+  .danger-btn{
+    width:100%;background:transparent;border:1px solid var(--oxblood);color:#E08A7E;
+    font-family:var(--font-body);font-weight:600;font-size:13px;padding:9px;border-radius:4px;cursor:pointer;margin-top:10px;
+  }
+  .danger-btn:hover{background:var(--oxblood);color:var(--white);}
+ </style>
 </head>
 <body>
 
@@ -503,7 +551,62 @@
       <button class="btn btn-solid" id="authSubmit" type="submit" style="width:100%;">Sign in</button>
     </form>
 
+    <a class="auth-link" id="recoverLink">Forgot your password?</a>
+
+    <div class="auth-divider" id="oauthDivider" hidden>OR CONTINUE WITH</div>
+    <div class="oauth-row" id="oauthRow" hidden>
+      <button class="oauth-btn" id="oauthGoogle" hidden>
+        <svg viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.17-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.61z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.71A5.41 5.41 0 0 1 3.68 9c0-.59.1-1.17.29-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.04l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+        Continue with Google
+      </button>
+      <button class="oauth-btn" id="oauthGithub" hidden>
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        Continue with GitHub
+      </button>
+    </div>
+
     <p class="auth-note">New accounts open with 250 free credits. Voting is always free.</p>
+  </div>
+</div>
+
+<div class="modal" id="accountModal" hidden>
+  <div class="modal-card" style="max-width:430px;">
+    <button class="modal-close" id="accountClose" aria-label="Close">&times;</button>
+    <p class="slug">CINEPAY ACCOUNT</p>
+    <h3 id="accountTitle">Your account</h3>
+
+    <div class="acct-section">
+      <h4>Profile</h4>
+      <label class="field">
+        <span>Display name</span>
+        <input id="accountName" type="text" autocomplete="name">
+      </label>
+      <p class="auth-msg" id="accountMsg"></p>
+      <button class="btn btn-solid" id="saveNameBtn" type="button" style="width:100%;">Save name</button>
+    </div>
+
+    <div class="acct-section">
+      <h4>Security</h4>
+      <label class="field">
+        <span>New password</span>
+        <input id="accountPassword" type="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters">
+      </label>
+      <button class="btn" id="changePasswordBtn" type="button" style="width:100%;">Change password</button>
+    </div>
+
+    <div class="acct-section">
+      <h4>Recent credit activity</h4>
+      <div class="acct-ledger" id="accountLedger"></div>
+    </div>
+
+    <div class="acct-section">
+      <h4>Your projects</h4>
+      <div class="acct-projects" id="accountProjects"></div>
+    </div>
+
+    <div class="acct-section">
+      <button class="danger-btn" id="deleteAccountBtn" type="button">Delete account</button>
+    </div>
   </div>
 </div>
 
@@ -729,7 +832,7 @@
     <h2>Buy CinePay credits</h2>
     <p>Every generation — image, video, voice, or music — spends credits. Buy what you need, or subscribe monthly for a standing allowance. No surprise charges: you'll always see the credit cost before you generate.</p>
   </div>
-  <p class="credit-disclaimer">No payment processor is connected to this build. These buttons add credits to your account immediately and take no money — the ledger records them as unpaid demo top-ups.</p>
+  <p class="credit-disclaimer" id="creditDisclaimer">No payment processor is connected to this build. These buttons add credits to your account immediately and take no money — the ledger records them as unpaid demo top-ups.</p>
   <div class="credit-grid">
     <div class="credit-card">
       <h3>Starter</h3>
@@ -975,7 +1078,11 @@
       signOut.href = '#';
       signOut.addEventListener('click', event => { event.preventDefault(); endSession(); });
 
-      nav.append(chip, el('span', 'nav-user', session.user.displayName || session.user.email), signOut);
+      const name = el('a', 'nav-link', session.user.displayName || session.user.email);
+      name.title = 'Manage your account';
+      name.addEventListener('click', event => { event.preventDefault(); openAccount(); });
+
+      nav.append(chip, name, signOut);
     } else {
       const signIn = el('a', 'nav-link', 'Sign in');
       signIn.href = '#';
@@ -1012,10 +1119,21 @@
       session.user = data.user;
       session.balance = data.balance || 0;
       if (data.costs) session.costs = data.costs;
+      updateCreditDisclaimer(Boolean(data.paymentsConfigured));
     } catch (error) {
       session.user = null;
     }
     renderSession();
+  }
+
+  function updateCreditDisclaimer(paymentsConfigured){
+    const disclaimer = $('#creditDisclaimer');
+    if (!disclaimer) return;
+    if (paymentsConfigured){
+      disclaimer.textContent = 'Payments are processed by Stripe. Credits are added to your account after payment is confirmed.';
+    } else {
+      disclaimer.textContent = 'No payment processor is connected to this build. These buttons add credits to your account immediately and take no money — the ledger records them as unpaid demo top-ups.';
+    }
   }
 
   async function endSession(){
@@ -1100,7 +1218,201 @@
     }
   });
 
-  /* ---------- workspace rendering ---------- */
+  /* ---------- oauth, recovery, identity callback ---------- */
+
+  // OAuth redirect and email-confirmation/recovery callbacks land back on this
+  // page with a hash. handleAuthCallback processes them on load (below); these
+  // handlers kick off the redirect and the recovery email.
+  const oauthDivider = $('#oauthDivider');
+  const oauthRow = $('#oauthRow');
+  const oauthGoogle = $('#oauthGoogle');
+  const oauthGithub = $('#oauthGithub');
+  const recoverLink = $('#recoverLink');
+
+  let identitySettings = { autoconfirm: false, disableSignup: false, providers: {} };
+
+  async function loadIdentitySettings(){
+    try {
+      identitySettings = await requestJSON('/api/auth/settings');
+    } catch { /* defaults */ }
+    const providers = identitySettings.providers || {};
+    const anyOAuth = Boolean(providers.google || providers.github);
+    oauthDivider.hidden = !anyOAuth;
+    oauthRow.hidden = !anyOAuth;
+    oauthGoogle.hidden = !providers.google;
+    oauthGithub.hidden = !providers.github;
+  }
+
+  function oauthLogin(provider){
+    // The Identity library redirects away; we import lazily so the static page
+    // does not depend on the runtime at parse time.
+    import('@netlify/identity').then(({ oauthLogin }) => {
+      try { oauthLogin(provider); }
+      catch (error) { authMsg.textContent = 'Could not start ' + provider + ' sign-in.'; }
+    });
+  }
+
+  oauthGoogle?.addEventListener('click', () => oauthLogin('google'));
+  oauthGithub?.addEventListener('click', () => oauthLogin('github'));
+
+  recoverLink.addEventListener('click', async () => {
+    const email = $('#authEmail').value.trim();
+    if (!email){ authMsg.classList.add('ok'); authMsg.textContent = 'Enter your email above first, then tap this link.'; return; }
+    authMsg.classList.remove('ok');
+    authMsg.textContent = 'Sending a recovery link…';
+    try {
+      const { requestPasswordRecovery } = await import('@netlify/identity');
+      await requestPasswordRecovery(email);
+      authMsg.classList.add('ok');
+      authMsg.textContent = 'Check your inbox for a password reset link.';
+    } catch (error) {
+      authMsg.textContent = error.message || 'Could not send a recovery email.';
+    }
+  });
+
+  // Process OAuth/email-confirmation/recovery callbacks on load. A recovery
+  // callback means the user is signed in but must set a new password, so we open
+  // the account modal with the password field focused.
+  async function processAuthCallback(){
+    try {
+      const { handleAuthCallback } = await import('@netlify/identity');
+      const result = await handleAuthCallback();
+      if (!result) return;
+      if (result.type === 'recovery'){
+        await refreshSession();
+        openAccount();
+        setTimeout(() => $('#accountPassword')?.focus(), 100);
+        setStatus('Set a new password to finish recovering your account.');
+      } else if (result.type === 'confirmation' || result.type === 'oauth'){
+        await refreshSession();
+        setStatus('Signed in. Welcome to CinePay.');
+        loadMarketplace();
+      }
+    } catch (error) {
+      setStatus(error.message || 'Sign-in callback failed.', true);
+    }
+  }
+
+  /* ---------- account management modal ---------- */
+
+  const accountModal = $('#accountModal');
+  const accountMsg = $('#accountMsg');
+
+  function openAccount(){
+    if (!session.user){ openAuth('login'); return; }
+    accountMsg.textContent = '';
+    accountMsg.classList.remove('ok');
+    $('#accountName').value = session.user.displayName || '';
+    $('#accountPassword').value = '';
+    renderAccountLedger();
+    renderAccountProjects();
+    accountModal.hidden = false;
+  }
+  function closeAccount(){ accountModal.hidden = true; }
+
+  $('#accountClose').addEventListener('click', closeAccount);
+  accountModal.addEventListener('click', event => { if (event.target === accountModal) closeAccount(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && !accountModal.hidden) closeAccount(); });
+
+  function renderAccountLedger(){
+    const holder = $('#accountLedger');
+    holder.replaceChildren();
+    fetch('/api/me').then(r => r.json()).then(data => {
+      const ledger = data.ledger || [];
+      if (!ledger.length){ holder.append(el('p', null, 'No activity yet.')); return; }
+      ledger.forEach(entry => {
+        const line = el('div');
+        const sign = entry.delta > 0 ? '+' : '';
+        const cls = entry.delta > 0 ? 'delta-pos' : 'delta-neg';
+        line.append(el('span', cls, `${sign}${entry.delta}`), document.createTextNode(` ${entry.reason}`));
+        holder.append(line);
+      });
+    }).catch(() => holder.append(el('p', null, 'Could not load activity.')));
+  }
+
+  function renderAccountProjects(){
+    const holder = $('#accountProjects');
+    holder.replaceChildren();
+    fetch('/api/me').then(r => r.json()).then(data => {
+      const projects = data.projects || [];
+      if (!projects.length){ holder.append(el('p', null, 'No projects yet — generate one from the dashboard.')); return; }
+      projects.forEach(project => {
+        const row = el('div', 'acct-project');
+        const title = el('span', 'ptitle', project.title);
+        const del = el('button', 'pdel', 'Delete');
+        del.addEventListener('click', async () => {
+          if (!confirm(`Delete “${project.title}”? This removes its stills, clips, and any marketplace listing. This cannot be undone.`)) return;
+          del.disabled = true;
+          try {
+            await requestJSON(`/api/project/${project.id}`, {}, 'DELETE');
+            row.remove();
+            // If the open project is the one we just deleted, leave the workspace.
+            if (state.project?.id === project.id){ closeWorkspace(); state.project = null; }
+            setStatus(`“${project.title}” deleted.`);
+          } catch (error) {
+            del.disabled = false;
+            alert(error.message);
+          }
+        });
+        row.append(title, del);
+        holder.append(row);
+      });
+    }).catch(() => holder.append(el('p', null, 'Could not load projects.')));
+  }
+
+  $('#saveNameBtn').addEventListener('click', async () => {
+    const name = $('#accountName').value.trim();
+    if (!name){ accountMsg.textContent = 'A display name is required.'; return; }
+    const btn = $('#saveNameBtn');
+    btn.disabled = true;
+    accountMsg.textContent = '';
+    try {
+      const data = await requestJSON('/api/account/profile', { name });
+      session.user = data.user;
+      renderSession();
+      accountMsg.classList.add('ok');
+      accountMsg.textContent = 'Name saved.';
+    } catch (error) {
+      accountMsg.textContent = error.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('#changePasswordBtn').addEventListener('click', async () => {
+    const password = $('#accountPassword').value;
+    if (password.length < 8){ accountMsg.textContent = 'Use a password of at least 8 characters.'; return; }
+    const btn = $('#changePasswordBtn');
+    btn.disabled = true;
+    accountMsg.textContent = '';
+    try {
+      await requestJSON('/api/account/password', { password });
+      $('#accountPassword').value = '';
+      accountMsg.classList.add('ok');
+      accountMsg.textContent = 'Password changed.';
+    } catch (error) {
+      accountMsg.textContent = error.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('#deleteAccountBtn').addEventListener('click', async () => {
+    const confirmText = prompt('This permanently deletes your account, projects, stills, clips, and credit history. Type DELETE to confirm.');
+    if (confirmText?.trim().toUpperCase() !== 'DELETE') return;
+    const btn = $('#deleteAccountBtn');
+    btn.disabled = true;
+    try {
+      await requestJSON('/api/account/delete', { confirm: 'DELETE' });
+      closeAccount();
+      await endSession();
+      setStatus('Your account was deleted.');
+    } catch (error) {
+      btn.disabled = false;
+      alert(error.message);
+    }
+  });
+
 
   function renderStory(project){
     const doc = $('#storyDoc');
@@ -1846,9 +2158,14 @@
     }
 
     button.disabled = true;
-    note.textContent = 'Adding credits…';
+    note.textContent = 'Starting checkout…';
     try {
       const data = await requestJSON('/api/credits/checkout', { pack: button.dataset.pack });
+      if (data.checkout && data.url){
+        // Real Stripe Checkout: leave the page; credits land via the webhook.
+        window.location.href = data.url;
+        return;
+      }
       setBalance(data.balance);
       note.textContent = `${money(data.credits)} credits added. ${data.notice}`;
     } catch (error) {
@@ -1874,7 +2191,9 @@
   disableSampleVoting();
   refreshSession();
   loadMarketplace();
-</script>
+  loadIdentitySettings();
+  processAuthCallback();
+ </script>
 
 </body>
 </html>
