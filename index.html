@@ -130,9 +130,11 @@
     content:'';position:absolute;top:9px;left:20px;right:20px;height:1px;background:var(--line);
   }
   .rail-step{display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;flex:1;}
-  .rail-dot{width:19px;height:19px;border-radius:50%;background:var(--ink);border:2px solid var(--gold-dim);z-index:1;}
-  .rail-step:nth-child(1) .rail-dot, .rail-step:nth-child(2) .rail-dot{border-color:var(--gold);background:var(--gold);}
-  .rail-label{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);text-transform:uppercase;letter-spacing:1px;}
+  .rail-dot{width:19px;height:19px;border-radius:50%;background:var(--ink);border:2px solid var(--gold-dim);z-index:1;transition:all .3s;}
+  .rail-step.done .rail-dot{border-color:var(--gold);background:var(--gold);}
+  .rail-step.active .rail-dot{border-color:var(--gold);background:var(--ink);box-shadow:0 0 0 4px rgba(201,162,39,.14);animation:pulse 1.3s ease-in-out infinite;}
+  .rail-label{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);text-transform:uppercase;letter-spacing:1px;transition:color .3s;}
+  .rail-step.done .rail-label, .rail-step.active .rail-label{color:var(--white);}
 
   section.projects{max-width:1080px;margin:90px auto 0;padding:0 24px 100px;}
   .section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;}
@@ -332,11 +334,281 @@
   .tl-track-label{font-family:var(--font-mono);font-size:10px;color:#5c5750;width:60px;flex-shrink:0;}
 
   .back-link{font-family:var(--font-body);font-size:12px;color:var(--white-dim);cursor:pointer;text-decoration:underline;}
-</style>
+
+  /* ---- generated imagery ---- */
+  .thumb-img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;
+    opacity:0;transition:opacity .55s ease;
+  }
+  .thumb-img.ready{opacity:1;}
+  .thumb-pending::before{
+    content:'';position:absolute;inset:0;z-index:1;
+    background:linear-gradient(100deg, transparent 18%, rgba(246,246,243,.07) 50%, transparent 82%);
+    background-size:240% 100%;animation:sweep 1.5s linear infinite;
+  }
+  @keyframes sweep{from{background-position:130% 0;}to{background-position:-130% 0;}}
+  .card-thumb .status, .shot-num, .mv-thumb .preview-badge{z-index:2;}
+  .card-thumb .status{position:relative;background:rgba(6,7,8,.6);padding:3px 8px;border-radius:3px;}
+  .lb-thumb{position:relative;overflow:hidden;}
+  .fh-bg .thumb-img.ready{opacity:.9;}
+
+  /* ---- composer state ---- */
+  .composer.busy{opacity:.75;pointer-events:none;}
+  .composer .generate:disabled{opacity:.55;cursor:progress;}
+  .gen-status{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:.6px;color:var(--white-dim);
+    min-height:18px;margin:16px 0 0;text-align:center;
+  }
+  .gen-status.error{color:#E08A7E;}
+
+  /* ---- workspace views ---- */
+  .ws-view{display:none;}
+  .ws-view.active{display:block;}
+  .wsitem.muted{opacity:.35;cursor:default;}
+  .wsitem.muted:hover{color:var(--white-dim);}
+  .doc{max-width:660px;}
+  .doc-logline{font-family:var(--font-display);font-weight:700;font-size:26px;line-height:1.15;margin:0 0 16px;}
+  .doc-tags{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px;}
+  .doc-tag{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);border:1px solid var(--line);border-radius:3px;padding:3px 9px;}
+  .doc p{font-size:14px;line-height:1.7;color:var(--white-dim);margin:0 0 16px;}
+  .doc-brief{border-left:2px solid var(--gold-dim);padding:2px 0 2px 14px;font-style:italic;}
+  .script-scene{margin-bottom:30px;}
+  .script-slug{font-family:var(--font-mono);font-size:12px;letter-spacing:1.4px;color:var(--gold);margin:0 0 12px;}
+  .script-action{font-family:var(--font-mono);font-size:13px;line-height:1.75;color:var(--white-dim);white-space:pre-wrap;margin:0 0 18px;}
+  .script-line{max-width:400px;margin:0 auto 14px;}
+  .script-char{font-family:var(--font-mono);font-size:13px;letter-spacing:1.4px;color:var(--white);text-align:center;margin:0;}
+  .script-paren{font-family:var(--font-mono);font-size:12px;color:#5c5750;text-align:center;margin:0;}
+  .script-dialogue{font-family:var(--font-mono);font-size:13px;line-height:1.7;color:var(--white-dim);text-align:center;margin:0;}
+  .shot-card{cursor:pointer;transition:border-color .15s;}
+  .shot-card.selected{border-color:var(--gold);}
+  .shot-meta{font-family:var(--font-mono);font-size:10px;color:#5c5750;margin:6px 0 0;letter-spacing:.4px;}
+  .shot-fail{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;
+    font-family:var(--font-mono);font-size:10px;color:#E08A7E;text-align:center;padding:0 10px;
+  }
+  .ws-empty{max-width:420px;color:var(--white-dim);font-size:14px;line-height:1.7;}
+  .ws-empty h3{margin-bottom:10px;}
+  .tl-clip.pending{opacity:.35;border-style:dashed;}
+
+  /* ---- account ---- */
+  .nav-session{display:flex;align-items:center;gap:14px;}
+  .credit-chip{
+    font-family:var(--font-mono);font-size:11px;color:var(--white-dim);
+    border:1px solid var(--line);border-radius:999px;padding:4px 11px;white-space:nowrap;
+  }
+  .credit-chip b{color:var(--gold);}
+  .nav-user{
+    font-family:var(--font-mono);font-size:11px;color:var(--white-dim);
+    max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .nav-link{cursor:pointer;}
+
+  .modal{
+    position:fixed;inset:0;z-index:60;background:rgba(6,7,8,.84);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  .modal[hidden]{display:none;}
+  .modal-card{
+    position:relative;width:100%;max-width:390px;background:var(--ink-panel);
+    border:1px solid var(--line);border-radius:10px;padding:28px;
+  }
+  .modal-close{
+    position:absolute;top:8px;right:12px;background:none;border:none;
+    color:var(--white-dim);font-size:22px;line-height:1;cursor:pointer;
+  }
+  .modal-card h3{font-family:var(--font-display);font-weight:700;font-size:27px;margin:6px 0 8px;}
+  .modal-sub{font-size:13px;color:var(--white-dim);line-height:1.6;margin:0 0 18px;}
+  .auth-tabs{display:flex;gap:6px;margin-bottom:18px;}
+  .auth-tab{
+    flex:1;background:var(--ink-raised);border:1px solid var(--line);color:var(--white-dim);
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.6px;padding:8px;border-radius:4px;cursor:pointer;
+  }
+  .auth-tab.active{border-color:var(--gold);color:var(--white);}
+  .field{display:block;margin-bottom:12px;}
+  .field span{
+    display:block;font-family:var(--font-mono);font-size:10px;letter-spacing:1px;
+    color:#5c5750;margin-bottom:5px;text-transform:uppercase;
+  }
+  .field input{
+    width:100%;background:var(--ink);border:1px solid var(--line);border-radius:4px;
+    color:var(--white);font-family:var(--font-body);font-size:13px;padding:9px 11px;
+  }
+  .field input:focus{outline:none;border-color:var(--gold-dim);}
+  .auth-msg{font-family:var(--font-mono);font-size:11px;line-height:1.5;color:#E08A7E;margin:0 0 10px;min-height:14px;}
+  .auth-msg.ok{color:var(--gold-light);}
+  .auth-note{font-family:var(--font-mono);font-size:10px;color:#5c5750;margin:14px 0 0;text-align:center;line-height:1.6;}
+
+  .cost-hint{
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.4px;color:#5c5750;
+    margin:10px 0 0;text-align:center;
+  }
+  .cost-hint b{color:var(--gold-dim);}
+
+  /* ---- live marketplace ---- */
+  .market-note{
+    font-family:var(--font-mono);font-size:11px;line-height:1.7;color:var(--white-dim);
+    border:1px dashed var(--line);border-radius:6px;padding:11px 14px;margin:0 0 22px;
+  }
+  .market-note[hidden]{display:none;}
+  .mv-meta{font-family:var(--font-mono);font-size:11px;color:var(--white-dim);}
+  .vote-btn:disabled{opacity:.5;cursor:progress;}
+  .vote-btn.sample{cursor:default;opacity:.6;}
+
+  /* ---- credits ---- */
+  .pack-note{font-family:var(--font-mono);font-size:10px;line-height:1.6;color:var(--white-dim);margin:10px 0 0;min-height:13px;}
+  .credit-disclaimer{
+    font-family:var(--font-mono);font-size:11px;line-height:1.7;color:var(--white-dim);
+    border:1px dashed var(--line);border-radius:6px;padding:11px 14px;margin:0 auto 26px;max-width:640px;
+  }
+
+  /* ---- render + publish ---- */
+  .ws-actions{display:flex;align-items:center;gap:8px;}
+  .render-note{font-family:var(--font-mono);font-size:10px;line-height:1.6;color:#5c5750;margin:8px 0 0;}
+  .render-note.error{color:#E08A7E;}
+  .clip-player{width:100%;border:1px solid var(--line);border-radius:6px;margin-top:12px;display:block;background:#000;}
+  .tl-clip.rendered{border-color:var(--gold);color:var(--white);cursor:pointer;}
+  .tl-clip.rendering{border-style:dashed;color:var(--gold-light);animation:pulse 1.6s ease-in-out infinite;}
+
+  /* ---- oauth + recovery ---- */
+  .auth-divider{
+    display:flex;align-items:center;gap:10px;margin:16px 0 12px;
+    font-family:var(--font-mono);font-size:10px;color:#5c5750;letter-spacing:.6px;
+  }
+  .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--line);}
+  .oauth-row{display:flex;flex-direction:column;gap:8px;}
+  .oauth-btn{
+    display:flex;align-items:center;justify-content:center;gap:9px;
+    background:var(--ink-raised);border:1px solid var(--line);color:var(--white);
+    font-family:var(--font-body);font-size:13px;font-weight:600;padding:10px;border-radius:4px;cursor:pointer;transition:all .15s;
+  }
+  .oauth-btn:hover{border-color:var(--gold-dim);background:var(--ink-panel);}
+  .oauth-btn svg{width:16px;height:16px;flex-shrink:0;}
+  .auth-link{
+    display:block;text-align:center;margin-top:12px;font-family:var(--font-mono);font-size:11px;
+    color:var(--white-dim);cursor:pointer;text-decoration:underline;
+  }
+  .auth-link:hover{color:var(--gold-light);}
+
+  /* ---- account modal ---- */
+  .acct-section{border-top:1px solid var(--line);padding-top:16px;margin-top:18px;}
+  .acct-section h4{
+    font-family:var(--font-mono);font-size:10px;letter-spacing:1px;color:#5c5750;
+    text-transform:uppercase;margin:0 0 10px;
+  }
+  .acct-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;font-size:13px;}
+  .acct-row .label{color:var(--white-dim);}
+  .acct-row .value{font-family:var(--font-mono);font-size:12px;color:var(--white);}
+  .acct-ledger{font-family:var(--font-mono);font-size:11px;line-height:1.8;color:var(--white-dim);max-height:180px;overflow:auto;margin-top:6px;}
+  .acct-ledger .delta-pos{color:var(--gold-light);}
+  .acct-ledger .delta-neg{color:#E08A7E;}
+  .acct-projects{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+  .acct-project{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    background:var(--ink-raised);border:1px solid var(--line);border-radius:5px;padding:8px 10px;font-size:12px;
+  }
+  .acct-project .ptitle{color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .acct-project .pdel{
+    font-family:var(--font-mono);font-size:10px;color:#E08A7E;background:none;border:none;cursor:pointer;
+  }
+  .acct-project .pdel:hover{color:#f2984c;}
+  .danger-btn{
+    width:100%;background:transparent;border:1px solid var(--oxblood);color:#E08A7E;
+    font-family:var(--font-body);font-weight:600;font-size:13px;padding:9px;border-radius:4px;cursor:pointer;margin-top:10px;
+  }
+  .danger-btn:hover{background:var(--oxblood);color:var(--white);}
+ </style>
 </head>
 <body>
 
 <div class="rain"></div>
+
+<div class="modal" id="authModal" hidden>
+  <div class="modal-card">
+    <button class="modal-close" id="authClose" aria-label="Close">&times;</button>
+    <p class="slug">CINEPAY ACCOUNT</p>
+    <h3 id="authTitle">Sign in</h3>
+    <p class="modal-sub" id="authSub">Your films, credits, and votes live with your account.</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-auth="login">Sign in</button>
+      <button class="auth-tab" data-auth="signup">Create account</button>
+    </div>
+
+    <form id="authForm">
+      <label class="field" id="authNameField" hidden>
+        <span>Name</span>
+        <input id="authName" type="text" autocomplete="name" placeholder="Chioma Okeke">
+      </label>
+      <label class="field">
+        <span>Email</span>
+        <input id="authEmail" type="email" autocomplete="email" required>
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input id="authPassword" type="password" autocomplete="current-password" required minlength="8">
+      </label>
+      <p class="auth-msg" id="authMsg"></p>
+      <button class="btn btn-solid" id="authSubmit" type="submit" style="width:100%;">Sign in</button>
+    </form>
+
+    <a class="auth-link" id="recoverLink">Forgot your password?</a>
+
+    <div class="auth-divider" id="oauthDivider" hidden>OR CONTINUE WITH</div>
+    <div class="oauth-row" id="oauthRow" hidden>
+      <button class="oauth-btn" id="oauthGoogle" hidden>
+        <svg viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.17-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.61z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.71A5.41 5.41 0 0 1 3.68 9c0-.59.1-1.17.29-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.04l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+        Continue with Google
+      </button>
+      <button class="oauth-btn" id="oauthGithub" hidden>
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        Continue with GitHub
+      </button>
+    </div>
+
+    <p class="auth-note">New accounts open with 250 free credits. Voting is always free.</p>
+  </div>
+</div>
+
+<div class="modal" id="accountModal" hidden>
+  <div class="modal-card" style="max-width:430px;">
+    <button class="modal-close" id="accountClose" aria-label="Close">&times;</button>
+    <p class="slug">CINEPAY ACCOUNT</p>
+    <h3 id="accountTitle">Your account</h3>
+
+    <div class="acct-section">
+      <h4>Profile</h4>
+      <label class="field">
+        <span>Display name</span>
+        <input id="accountName" type="text" autocomplete="name">
+      </label>
+      <p class="auth-msg" id="accountMsg"></p>
+      <button class="btn btn-solid" id="saveNameBtn" type="button" style="width:100%;">Save name</button>
+    </div>
+
+    <div class="acct-section">
+      <h4>Security</h4>
+      <label class="field">
+        <span>New password</span>
+        <input id="accountPassword" type="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters">
+      </label>
+      <button class="btn" id="changePasswordBtn" type="button" style="width:100%;">Change password</button>
+    </div>
+
+    <div class="acct-section">
+      <h4>Recent credit activity</h4>
+      <div class="acct-ledger" id="accountLedger"></div>
+    </div>
+
+    <div class="acct-section">
+      <h4>Your projects</h4>
+      <div class="acct-projects" id="accountProjects"></div>
+    </div>
+
+    <div class="acct-section">
+      <button class="danger-btn" id="deleteAccountBtn" type="button">Delete account</button>
+    </div>
+  </div>
+</div>
 
 <header>
   <div class="brand">
@@ -357,7 +629,7 @@
   <nav>
     <a href="#" id="navMarketplace">Marketplace</a>
     <a href="#" id="navCredits">Buy credits</a>
-    <a href="#">Sign in</a>
+    <span class="nav-session" id="navSession"></span>
     <button class="btn btn-solid" id="openWorkspaceBtn">Start free</button>
   </nav>
 </header>
@@ -369,8 +641,8 @@
     <h1>Turn your idea<br>into a movie.</h1>
     <p class="sub">Describe a scene. Blood of Lagos Studio builds the story, script, storyboard, and shots — then generates the footage. You direct. It executes.</p>
 
-    <div class="composer">
-      <textarea placeholder="Create a 60-second cinematic crime drama scene in Lagos at night. Five childhood friends reunite after 20 years. Rain is falling. One of them is hiding a secret.">Create a 60-second cinematic crime drama scene in Lagos at night. Five childhood friends reunite after 20 years. Rain is falling. One of them is hiding a secret.</textarea>
+    <div class="composer" id="composer">
+      <textarea id="briefInput" placeholder="Create a 60-second cinematic crime drama scene in Lagos at night. Five childhood friends reunite after 20 years. Rain is falling. One of them is hiding a secret.">Create a 60-second cinematic crime drama scene in Lagos at night. Five childhood friends reunite after 20 years. Rain is falling. One of them is hiding a secret.</textarea>
       <div class="composer-row">
         <div class="mode-toggle">
           <button class="active" data-mode="basic">Basic</button>
@@ -379,6 +651,9 @@
         <button class="generate" id="generateBtn">Generate my film →</button>
       </div>
     </div>
+
+    <p class="gen-status" id="genStatus"></p>
+    <p class="cost-hint" id="costHint"></p>
 
     <div class="chips">
       <div class="chip">Romantic drama, Lisbon, golden hour</div>
@@ -404,26 +679,26 @@
       <h2>Recent projects</h2>
       <a href="#">View all</a>
     </div>
-    <div class="grid">
-      <div class="card" id="openWorkspaceCard">
-        <div class="card-thumb"><span class="status">7 of 9 shots generated</span></div>
+    <div class="grid" id="projectGrid">
+      <div class="card sample-card" data-slug="rain-over-lagos" data-brief="A 60-second cinematic crime drama in Lagos at night. Five childhood friends reunite after 20 years in a rain-soaked waterfront courtyard. One of them is hiding a secret that surfaces in the last shot.">
+        <div class="card-thumb" data-poster="rain-over-lagos" data-w="460" data-h="260"><span class="status">Sample project</span></div>
         <div class="card-body">
           <p class="card-title">Rain Over Lagos</p>
-          <p class="card-meta">Crime drama · 60s · Edited 2 hours ago</p>
+          <p class="card-meta">Crime drama · 60s · Open to generate</p>
         </div>
       </div>
-      <div class="card">
-        <div class="card-thumb"><span class="status">Draft — script only</span></div>
+      <div class="card sample-card" data-slug="the-last-danfo" data-brief="A 90-second comedy set in Lagos daytime traffic. A danfo bus driver on his last run before retirement argues his way through one final impossible fare.">
+        <div class="card-thumb" data-poster="the-last-danfo" data-w="460" data-h="260"><span class="status">Sample project</span></div>
         <div class="card-body">
           <p class="card-title">The Last Danfo</p>
-          <p class="card-meta">Comedy · 90s · Edited yesterday</p>
+          <p class="card-meta">Comedy · 90s · Open to generate</p>
         </div>
       </div>
-      <div class="card">
-        <div class="card-thumb"><span class="status">Rendering final cut</span></div>
+      <div class="card sample-card" data-slug="harmattan" data-brief="A 120-second family drama at dawn during harmattan. A mother watches her youngest son leave the compound with a suitcase, and neither of them says the thing that matters.">
+        <div class="card-thumb" data-poster="harmattan" data-w="460" data-h="260"><span class="status">Sample project</span></div>
         <div class="card-body">
           <p class="card-title">Harmattan</p>
-          <p class="card-meta">Family drama · 120s · Edited 3 days ago</p>
+          <p class="card-meta">Family drama · 120s · Open to generate</p>
         </div>
       </div>
     </div>
@@ -431,7 +706,7 @@
 </main>
 
 <div class="featured-hero">
-  <div class="fh-bg"></div>
+  <div class="fh-bg" data-poster="featured-hero" data-w="1600" data-h="900"></div>
   <div class="fh-scan"></div>
   <div class="fh-vignette"></div>
   <div class="fh-content">
@@ -467,17 +742,19 @@
     <div class="genre-tab" data-genre="romance">Romance</div>
   </div>
 
-  <div class="leaderboard" id="leaderboard">
-    <div class="lb-card"><div class="lb-rank">1</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Rain Over Lagos</p><p class="lb-votes"><b>4,812</b> votes</p></div></div>
-    <div class="lb-card"><div class="lb-rank">2</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">The Last Danfo</p><p class="lb-votes"><b>3,990</b> votes</p></div></div>
-    <div class="lb-card"><div class="lb-rank">3</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Harmattan</p><p class="lb-votes"><b>3,401</b> votes</p></div></div>
-    <div class="lb-card"><div class="lb-rank">4</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Okada Nights</p><p class="lb-votes"><b>2,977</b> votes</p></div></div>
-    <div class="lb-card"><div class="lb-rank">5</div><div class="lb-thumb"></div><div class="lb-body"><p class="lb-title">Blue Hour Market</p><p class="lb-votes"><b>2,640</b> votes</p></div></div>
+  <p class="market-note" id="marketNote" hidden></p>
+
+  <div class="leaderboard" id="leaderboard" data-sample="true">
+    <div class="lb-card"><div class="lb-rank">1</div><div class="lb-thumb" data-poster="rain-over-lagos" data-w="340" data-h="200"></div><div class="lb-body"><p class="lb-title">Rain Over Lagos</p><p class="lb-votes"><b>4,812</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">2</div><div class="lb-thumb" data-poster="the-last-danfo" data-w="340" data-h="200"></div><div class="lb-body"><p class="lb-title">The Last Danfo</p><p class="lb-votes"><b>3,990</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">3</div><div class="lb-thumb" data-poster="harmattan" data-w="340" data-h="200"></div><div class="lb-body"><p class="lb-title">Harmattan</p><p class="lb-votes"><b>3,401</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">4</div><div class="lb-thumb" data-poster="okada-nights" data-w="340" data-h="200"></div><div class="lb-body"><p class="lb-title">Okada Nights</p><p class="lb-votes"><b>2,977</b> votes</p></div></div>
+    <div class="lb-card"><div class="lb-rank">5</div><div class="lb-thumb" data-poster="blue-hour-market" data-w="340" data-h="200"></div><div class="lb-body"><p class="lb-title">Blue Hour Market</p><p class="lb-votes"><b>2,640</b> votes</p></div></div>
   </div>
 
-  <div class="market-grid" id="marketGrid">
+  <div class="market-grid" id="marketGrid" data-sample="true">
     <div class="mv-card" data-genre="crime drama">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="rain-over-lagos" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">Rain Over Lagos</p>
         <p class="mv-creator">by @chiomadirects</p>
@@ -488,7 +765,7 @@
       </div>
     </div>
     <div class="mv-card" data-genre="comedy">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="the-last-danfo" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">The Last Danfo</p>
         <p class="mv-creator">by @femithefilmmaker</p>
@@ -499,7 +776,7 @@
       </div>
     </div>
     <div class="mv-card" data-genre="drama">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="harmattan" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">Harmattan</p>
         <p class="mv-creator">by @amara.films</p>
@@ -510,7 +787,7 @@
       </div>
     </div>
     <div class="mv-card" data-genre="thriller crime">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="okada-nights" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">Okada Nights</p>
         <p class="mv-creator">by @tundemakes</p>
@@ -521,7 +798,7 @@
       </div>
     </div>
     <div class="mv-card" data-genre="scifi">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="blue-hour-market" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">Blue Hour Market</p>
         <p class="mv-creator">by @kelechivisuals</p>
@@ -532,7 +809,7 @@
       </div>
     </div>
     <div class="mv-card" data-genre="romance drama">
-      <div class="mv-thumb"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
+      <div class="mv-thumb" data-poster="third-mainland" data-w="440" data-h="248"><span class="preview-badge"><span class="dot"></span>Preview</span></div>
       <div class="mv-body">
         <p class="mv-title">Third Mainland</p>
         <p class="mv-creator">by @yemisi.k</p>
@@ -555,6 +832,7 @@
     <h2>Buy CinePay credits</h2>
     <p>Every generation — image, video, voice, or music — spends credits. Buy what you need, or subscribe monthly for a standing allowance. No surprise charges: you'll always see the credit cost before you generate.</p>
   </div>
+  <p class="credit-disclaimer" id="creditDisclaimer">No payment processor is connected to this build. These buttons add credits to your account immediately and take no money — the ledger records them as unpaid demo top-ups.</p>
   <div class="credit-grid">
     <div class="credit-card">
       <h3>Starter</h3>
@@ -565,7 +843,8 @@
         <li>Unlimited script drafts</li>
         <li>Standard render queue</li>
       </ul>
-      <button class="btn" style="width:100%;">Buy credits</button>
+      <button class="btn pack-btn" data-pack="starter" style="width:100%;">Add 500 credits</button>
+      <p class="pack-note"></p>
     </div>
     <div class="credit-card featured">
       <div class="badge">MOST POPULAR</div>
@@ -577,7 +856,8 @@
         <li>Priority render queue</li>
         <li>Submit films for monetization</li>
       </ul>
-      <button class="btn btn-solid" style="width:100%;">Subscribe</button>
+      <button class="btn btn-solid pack-btn" data-pack="creator" style="width:100%;">Add 1,500 credits</button>
+      <p class="pack-note"></p>
     </div>
     <div class="credit-card">
       <h3>Studio</h3>
@@ -588,100 +868,82 @@
         <li>Highest-priority render queue</li>
         <li>Reduced revenue-share fee on payouts</li>
       </ul>
-      <button class="btn" style="width:100%;">Subscribe</button>
+      <button class="btn pack-btn" data-pack="studio" style="width:100%;">Add 5,000 credits</button>
+      <p class="pack-note"></p>
     </div>
   </div>
 </section>
 
 <footer>
   <span>CinePay — prototype build</span>
-  <span>Sample data shown. No AI providers connected yet.</span>
+  <span>Accounts, credits, votes, stories, and stills are live. Sample marketplace cards appear only until real films are published; no payment processor is connected.</span>
 </footer>
 
 <div class="workspace" id="workspace">
   <div class="ws-sidebar">
     <div class="back-link" id="backLink" style="margin:0 20px 16px;">← Back to dashboard</div>
     <div class="wsgroup-label">Project</div>
-    <div class="wsitem">Story</div>
-    <div class="wsitem">Script</div>
-    <div class="wsitem">Characters</div>
-    <div class="wsitem">Locations</div>
+    <div class="wsitem" data-view="story">Story</div>
+    <div class="wsitem" data-view="script">Script</div>
+    <div class="wsitem muted">Characters</div>
+    <div class="wsitem muted">Locations</div>
     <div class="wsgroup-label">Production</div>
-    <div class="wsitem active">Storyboard</div>
-    <div class="wsitem">Shots</div>
-    <div class="wsitem">Assets</div>
-    <div class="wsitem">Audio</div>
+    <div class="wsitem active" data-view="storyboard">Storyboard</div>
+    <div class="wsitem muted">Shots</div>
+    <div class="wsitem muted">Assets</div>
+    <div class="wsitem muted">Audio</div>
     <div class="wsgroup-label">Finish</div>
-    <div class="wsitem">Timeline</div>
-    <div class="wsitem">Export</div>
+    <div class="wsitem muted">Timeline</div>
+    <div class="wsitem muted">Export</div>
   </div>
 
   <div class="ws-main">
     <div class="ws-topbar">
       <div>
-        <div class="proj-name">Rain Over Lagos</div>
-        <div class="proj-scene">SCENE 1 · EXT. WATERFRONT COURTYARD — NIGHT</div>
+        <div class="proj-name" id="wsTitle">No project loaded</div>
+        <div class="proj-scene" id="wsScene">Describe a scene on the dashboard to begin</div>
       </div>
-      <button class="btn">Generate all shots</button>
+      <div class="ws-actions">
+        <button class="btn" id="publishBtn" hidden>Submit to marketplace</button>
+        <button class="btn" id="generateAllBtn">Generate all shots</button>
+      </div>
     </div>
 
     <div class="ws-body">
       <div class="ws-canvas">
-        <h3>Storyboard</h3>
-        <div class="storyboard-grid">
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">01</span></div><div class="shot-info"><p class="shot-type">Wide shot</p><p>Five friends arrive separately, rain hammering the courtyard.</p></div></div>
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">02</span></div><div class="shot-info"><p class="shot-type">Medium shot</p><p>David hesitates at the gate, hand on the latch.</p></div></div>
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">03</span></div><div class="shot-info"><p class="shot-type">Close-up</p><p>Amara notices something in David's expression.</p></div></div>
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">04</span></div><div class="shot-info"><p class="shot-type">Over-the-shoulder</p><p>The group reunites, umbrella light flickering.</p></div></div>
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">05</span></div><div class="shot-info"><p class="shot-type">Tracking shot</p><p>Camera follows them across the wet courtyard.</p></div></div>
-          <div class="shot-card"><div class="shot-thumb"><span class="shot-num">06</span></div><div class="shot-info"><p class="shot-type">Extreme close-up</p><p>Water dripping off a phone screen David is hiding.</p></div></div>
+        <div class="ws-view" id="viewStory">
+          <h3>Story</h3>
+          <div class="doc" id="storyDoc"></div>
+        </div>
+
+        <div class="ws-view" id="viewScript">
+          <h3>Script</h3>
+          <div class="doc" id="scriptDoc"></div>
+        </div>
+
+        <div class="ws-view active" id="viewStoryboard">
+          <h3>Storyboard</h3>
+          <div class="storyboard-grid" id="storyboardGrid"></div>
+          <div class="ws-empty" id="storyboardEmpty">
+            <p>Nothing to board yet. Head back to the dashboard, describe the scene you want, and CinePay will break the story, write the script, and lay out every shot before generating the frames.</p>
+          </div>
         </div>
       </div>
 
       <div class="ws-right">
-        <h4>Shot 03 — controls</h4>
-        <div class="control-row">
-          <label>Camera</label>
-          <div class="pill-group">
-            <div class="pill on">Close-up</div>
-            <div class="pill">Push-in</div>
-            <div class="pill">Handheld</div>
-          </div>
-        </div>
-        <div class="control-row">
-          <label>Lighting</label>
-          <div class="pill-group">
-            <div class="pill on">Neon</div>
-            <div class="pill">Backlit</div>
-            <div class="pill">Rim light</div>
-          </div>
-        </div>
-        <div class="control-row">
-          <label>Mood</label>
-          <div class="pill-group">
-            <div class="pill on">Tense</div>
-            <div class="pill">Mysterious</div>
-          </div>
-        </div>
-        <div class="control-row">
-          <label>Duration</label>
-          <div class="pill-group">
-            <div class="pill">3s</div>
-            <div class="pill on">5s</div>
-            <div class="pill">8s</div>
-          </div>
-        </div>
-        <button class="btn btn-solid" style="width:100%;margin-top:6px;">Generate shot</button>
+        <h4 id="shotControlsTitle">Shot controls</h4>
+        <div id="shotControls"></div>
+        <button class="btn btn-solid" id="generateShotBtn" style="width:100%;margin-top:6px;">Generate shot</button>
+        <button class="btn" id="renderShotBtn" style="width:100%;margin-top:8px;">Render video</button>
+        <p class="render-note" id="renderNote"></p>
+        <div id="clipHolder"></div>
       </div>
     </div>
 
     <div class="ws-timeline">
       <div class="tl-track" style="margin-bottom:8px;">
         <div class="tl-track-label">VIDEO</div>
-        <div class="tl-clip">Shot 01</div>
-        <div class="tl-clip">Shot 02</div>
-        <div class="tl-clip">Shot 03</div>
-        <div class="tl-clip" style="opacity:.35;border-style:dashed;">Shot 04</div>
+        <div id="timelineVideo" style="display:flex;gap:4px;"></div>
       </div>
       <div class="tl-track">
         <div class="tl-track-label">AUDIO</div>
@@ -693,61 +955,1245 @@
 </div>
 
 <script>
-  const modeButtons = document.querySelectorAll('.mode-toggle button');
-  modeButtons.forEach(b => b.addEventListener('click', () => {
-    modeButtons.forEach(x => x.classList.remove('active'));
-    b.classList.add('active');
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+  const state = { project: null, selected: 1, mode: 'basic', busy: false, overrides: {} };
+
+  function el(tag, className, text){
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  async function requestJSON(url, body, method){
+    const verb = method || (body ? 'POST' : 'GET');
+    const res = await fetch(url, verb === 'GET' ? undefined : {
+      method: verb,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok){
+      const error = new Error(data.error || 'Request failed');
+      error.status = res.status;
+      error.data = data;
+      throw error;
+    }
+    return data;
+  }
+
+  /* ---------- imagery ---------- */
+
+  // Every generated still lives in Netlify Blobs and is resized on the fly by
+  // the Netlify Image CDN, so each surface asks for exactly the size it shows.
+  function cdnUrl(path, w, h){
+    return `/.netlify/images?url=${encodeURIComponent(path)}&w=${w}&h=${h}&fit=cover`;
+  }
+
+  function paintThumb(container, framePath, w, h){
+    let img = container.querySelector('img.thumb-img');
+    if (!img){
+      img = el('img', 'thumb-img');
+      img.alt = '';
+      img.decoding = 'async';
+      container.prepend(img);
+    }
+    img.classList.remove('ready');
+    img.addEventListener('load', () => img.classList.add('ready'), { once: true });
+    img.src = cdnUrl(framePath, w, h);
+  }
+
+  const posterRequests = new Map();
+  function posterUrl(slug){
+    if (!posterRequests.has(slug)){
+      posterRequests.set(slug, requestJSON(`/api/poster/${slug}`).then(data => data.frameUrl));
+    }
+    return posterRequests.get(slug);
+  }
+
+  // Catalogue stills are generated once and cached forever, so they are only
+  // requested when a card actually scrolls into view.
+  const posterObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const node = entry.target;
+      posterObserver.unobserve(node);
+      node.classList.add('thumb-pending');
+      posterUrl(node.dataset.poster)
+        .then(url => paintThumb(node, url, Number(node.dataset.w) || 440, Number(node.dataset.h) || 248))
+        .catch(() => {})
+        .finally(() => node.classList.remove('thumb-pending'));
+    });
+  }, { rootMargin: '250px' });
+
+  $$('[data-poster]').forEach(node => posterObserver.observe(node));
+
+  /* ---------- pipeline rail ---------- */
+
+  const railSteps = $$('.rail-step');
+  function setRail(doneThrough, activeIndex){
+    railSteps.forEach((step, index) => {
+      step.classList.toggle('done', index <= doneThrough);
+      step.classList.toggle('active', index === activeIndex);
+    });
+  }
+  setRail(0, -1);
+
+  const composer = $('#composer');
+  const briefInput = $('#briefInput');
+  const generateBtn = $('#generateBtn');
+  const genStatus = $('#genStatus');
+
+  function setStatus(message, isError){
+    genStatus.textContent = message || '';
+    genStatus.classList.toggle('error', Boolean(isError));
+  }
+
+  /* ---------- account, credits ---------- */
+
+  // Everything that costs credits is priced by the server; the page only ever
+  // displays what /api/me reports so the two can never drift.
+  const session = { user: null, balance: 0, costs: { story: 10, frame: 20, video: 120 } };
+
+  const money = n => Number(n || 0).toLocaleString();
+
+  function setBalance(balance){
+    if (typeof balance !== 'number') return;
+    session.balance = balance;
+    renderSession();
+  }
+
+  function renderSession(){
+    const nav = $('#navSession');
+    nav.replaceChildren();
+
+    if (session.user){
+      const chip = el('span', 'credit-chip');
+      chip.append(el('b', null, money(session.balance)), document.createTextNode(' credits'));
+      chip.title = `Story ${session.costs.story} · still ${session.costs.frame} · video ${session.costs.video} credits`;
+
+      const signOut = el('a', 'nav-link', 'Sign out');
+      signOut.href = '#';
+      signOut.addEventListener('click', event => { event.preventDefault(); endSession(); });
+
+      const name = el('a', 'nav-link', session.user.displayName || session.user.email);
+      name.title = 'Manage your account';
+      name.addEventListener('click', event => { event.preventDefault(); openAccount(); });
+
+      nav.append(chip, name, signOut);
+    } else {
+      const signIn = el('a', 'nav-link', 'Sign in');
+      signIn.href = '#';
+      signIn.addEventListener('click', event => { event.preventDefault(); openAuth('login'); });
+      nav.append(signIn);
+    }
+
+    renderCostHint();
+    renderShotActions();
+    renderPublishButton();
+  }
+
+  function renderCostHint(){
+    const hint = $('#costHint');
+    hint.replaceChildren();
+
+    if (!session.user){
+      hint.append(document.createTextNode('Sign in to generate — new accounts open with '));
+      hint.append(el('b', null, '250 free credits'));
+      hint.append(document.createTextNode('.'));
+      return;
+    }
+
+    hint.append(document.createTextNode('This story costs '));
+    hint.append(el('b', null, `${session.costs.story} credits`));
+    hint.append(document.createTextNode(`, each still ${session.costs.frame}, each video clip ${session.costs.video}. Balance `));
+    hint.append(el('b', null, money(session.balance)));
+    hint.append(document.createTextNode('.'));
+  }
+
+  async function refreshSession(){
+    try {
+      const data = await requestJSON('/api/me');
+      session.user = data.user;
+      session.balance = data.balance || 0;
+      if (data.costs) session.costs = data.costs;
+      updateCreditDisclaimer(Boolean(data.paymentsConfigured));
+    } catch (error) {
+      session.user = null;
+    }
+    renderSession();
+  }
+
+  function updateCreditDisclaimer(paymentsConfigured){
+    const disclaimer = $('#creditDisclaimer');
+    if (!disclaimer) return;
+    if (paymentsConfigured){
+      disclaimer.textContent = 'Payments are processed by Stripe. Credits are added to your account after payment is confirmed.';
+    } else {
+      disclaimer.textContent = 'No payment processor is connected to this build. These buttons add credits to your account immediately and take no money — the ledger records them as unpaid demo top-ups.';
+    }
+  }
+
+  async function endSession(){
+    try { await requestJSON('/api/auth/logout', {}); } catch (error) {}
+    session.user = null;
+    session.balance = 0;
+    renderSession();
+    loadMarketplace();
+    setStatus('Signed out.');
+  }
+
+  /* ---------- auth dialog ---------- */
+
+  const authModal = $('#authModal');
+  const authForm = $('#authForm');
+  const authMsg = $('#authMsg');
+  let authMode = 'login';
+
+  function setAuthMode(mode){
+    authMode = mode;
+    $$('.auth-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.auth === mode));
+    $('#authTitle').textContent = mode === 'signup' ? 'Create your account' : 'Sign in';
+    $('#authNameField').hidden = mode !== 'signup';
+    $('#authPassword').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+    $('#authSubmit').textContent = mode === 'signup' ? 'Create account' : 'Sign in';
+  }
+
+  function openAuth(mode, reason){
+    setAuthMode(mode || 'login');
+    authMsg.textContent = '';
+    authMsg.classList.remove('ok');
+    $('#authSub').textContent = reason || 'Your films, credits, and votes live with your account.';
+    authModal.hidden = false;
+    $('#authEmail').focus();
+  }
+
+  function closeAuth(){
+    authModal.hidden = true;
+  }
+
+  $$('.auth-tab').forEach(tab => tab.addEventListener('click', () => {
+    setAuthMode(tab.dataset.auth);
+    authMsg.textContent = '';
   }));
+  $('#authClose').addEventListener('click', closeAuth);
+  authModal.addEventListener('click', event => { if (event.target === authModal) closeAuth(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && !authModal.hidden) closeAuth(); });
+
+  authForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submit = $('#authSubmit');
+    submit.disabled = true;
+    authMsg.classList.remove('ok');
+    authMsg.textContent = '';
+
+    try {
+      const data = await requestJSON(`/api/auth/${authMode}`, {
+        email: $('#authEmail').value.trim(),
+        password: $('#authPassword').value,
+        name: $('#authName').value.trim(),
+      });
+
+      if (data.pendingConfirmation){
+        // Identity is set to confirm addresses by email, so there is no session yet.
+        authMsg.classList.add('ok');
+        authMsg.textContent = 'Check your inbox to confirm the address, then sign in.';
+        setAuthMode('login');
+        return;
+      }
+
+      session.user = data.user;
+      session.balance = data.balance || 0;
+      renderSession();
+      closeAuth();
+      authForm.reset();
+      setStatus(`Signed in as ${data.user.displayName || data.user.email}.`);
+      loadMarketplace();
+    } catch (error) {
+      authMsg.textContent = error.message;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  /* ---------- oauth, recovery, identity callback ---------- */
+
+  // OAuth redirect and email-confirmation/recovery callbacks land back on this
+  // page with a hash. handleAuthCallback processes them on load (below); these
+  // handlers kick off the redirect and the recovery email.
+  const oauthDivider = $('#oauthDivider');
+  const oauthRow = $('#oauthRow');
+  const oauthGoogle = $('#oauthGoogle');
+  const oauthGithub = $('#oauthGithub');
+  const recoverLink = $('#recoverLink');
+
+  let identitySettings = { autoconfirm: false, disableSignup: false, providers: {} };
+
+  async function loadIdentitySettings(){
+    try {
+      identitySettings = await requestJSON('/api/auth/settings');
+    } catch { /* defaults */ }
+    const providers = identitySettings.providers || {};
+    const anyOAuth = Boolean(providers.google || providers.github);
+    oauthDivider.hidden = !anyOAuth;
+    oauthRow.hidden = !anyOAuth;
+    oauthGoogle.hidden = !providers.google;
+    oauthGithub.hidden = !providers.github;
+  }
+
+  function oauthLogin(provider){
+    // The Identity library redirects away; we import lazily so the static page
+    // does not depend on the runtime at parse time.
+    import('@netlify/identity').then(({ oauthLogin }) => {
+      try { oauthLogin(provider); }
+      catch (error) { authMsg.textContent = 'Could not start ' + provider + ' sign-in.'; }
+    });
+  }
+
+  oauthGoogle?.addEventListener('click', () => oauthLogin('google'));
+  oauthGithub?.addEventListener('click', () => oauthLogin('github'));
+
+  recoverLink.addEventListener('click', async () => {
+    const email = $('#authEmail').value.trim();
+    if (!email){ authMsg.classList.add('ok'); authMsg.textContent = 'Enter your email above first, then tap this link.'; return; }
+    authMsg.classList.remove('ok');
+    authMsg.textContent = 'Sending a recovery link…';
+    try {
+      const { requestPasswordRecovery } = await import('@netlify/identity');
+      await requestPasswordRecovery(email);
+      authMsg.classList.add('ok');
+      authMsg.textContent = 'Check your inbox for a password reset link.';
+    } catch (error) {
+      authMsg.textContent = error.message || 'Could not send a recovery email.';
+    }
+  });
+
+  // Process OAuth/email-confirmation/recovery callbacks on load. A recovery
+  // callback means the user is signed in but must set a new password, so we open
+  // the account modal with the password field focused.
+  async function processAuthCallback(){
+    try {
+      const { handleAuthCallback } = await import('@netlify/identity');
+      const result = await handleAuthCallback();
+      if (!result) return;
+      if (result.type === 'recovery'){
+        await refreshSession();
+        openAccount();
+        setTimeout(() => $('#accountPassword')?.focus(), 100);
+        setStatus('Set a new password to finish recovering your account.');
+      } else if (result.type === 'confirmation' || result.type === 'oauth'){
+        await refreshSession();
+        setStatus('Signed in. Welcome to CinePay.');
+        loadMarketplace();
+      }
+    } catch (error) {
+      setStatus(error.message || 'Sign-in callback failed.', true);
+    }
+  }
+
+  /* ---------- account management modal ---------- */
+
+  const accountModal = $('#accountModal');
+  const accountMsg = $('#accountMsg');
+
+  function openAccount(){
+    if (!session.user){ openAuth('login'); return; }
+    accountMsg.textContent = '';
+    accountMsg.classList.remove('ok');
+    $('#accountName').value = session.user.displayName || '';
+    $('#accountPassword').value = '';
+    renderAccountLedger();
+    renderAccountProjects();
+    accountModal.hidden = false;
+  }
+  function closeAccount(){ accountModal.hidden = true; }
+
+  $('#accountClose').addEventListener('click', closeAccount);
+  accountModal.addEventListener('click', event => { if (event.target === accountModal) closeAccount(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && !accountModal.hidden) closeAccount(); });
+
+  function renderAccountLedger(){
+    const holder = $('#accountLedger');
+    holder.replaceChildren();
+    fetch('/api/me').then(r => r.json()).then(data => {
+      const ledger = data.ledger || [];
+      if (!ledger.length){ holder.append(el('p', null, 'No activity yet.')); return; }
+      ledger.forEach(entry => {
+        const line = el('div');
+        const sign = entry.delta > 0 ? '+' : '';
+        const cls = entry.delta > 0 ? 'delta-pos' : 'delta-neg';
+        line.append(el('span', cls, `${sign}${entry.delta}`), document.createTextNode(` ${entry.reason}`));
+        holder.append(line);
+      });
+    }).catch(() => holder.append(el('p', null, 'Could not load activity.')));
+  }
+
+  function renderAccountProjects(){
+    const holder = $('#accountProjects');
+    holder.replaceChildren();
+    fetch('/api/me').then(r => r.json()).then(data => {
+      const projects = data.projects || [];
+      if (!projects.length){ holder.append(el('p', null, 'No projects yet — generate one from the dashboard.')); return; }
+      projects.forEach(project => {
+        const row = el('div', 'acct-project');
+        const title = el('span', 'ptitle', project.title);
+        const del = el('button', 'pdel', 'Delete');
+        del.addEventListener('click', async () => {
+          if (!confirm(`Delete “${project.title}”? This removes its stills, clips, and any marketplace listing. This cannot be undone.`)) return;
+          del.disabled = true;
+          try {
+            await requestJSON(`/api/project/${project.id}`, {}, 'DELETE');
+            row.remove();
+            // If the open project is the one we just deleted, leave the workspace.
+            if (state.project?.id === project.id){ closeWorkspace(); state.project = null; }
+            setStatus(`“${project.title}” deleted.`);
+          } catch (error) {
+            del.disabled = false;
+            alert(error.message);
+          }
+        });
+        row.append(title, del);
+        holder.append(row);
+      });
+    }).catch(() => holder.append(el('p', null, 'Could not load projects.')));
+  }
+
+  $('#saveNameBtn').addEventListener('click', async () => {
+    const name = $('#accountName').value.trim();
+    if (!name){ accountMsg.textContent = 'A display name is required.'; return; }
+    const btn = $('#saveNameBtn');
+    btn.disabled = true;
+    accountMsg.textContent = '';
+    try {
+      const data = await requestJSON('/api/account/profile', { name });
+      session.user = data.user;
+      renderSession();
+      accountMsg.classList.add('ok');
+      accountMsg.textContent = 'Name saved.';
+    } catch (error) {
+      accountMsg.textContent = error.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('#changePasswordBtn').addEventListener('click', async () => {
+    const password = $('#accountPassword').value;
+    if (password.length < 8){ accountMsg.textContent = 'Use a password of at least 8 characters.'; return; }
+    const btn = $('#changePasswordBtn');
+    btn.disabled = true;
+    accountMsg.textContent = '';
+    try {
+      await requestJSON('/api/account/password', { password });
+      $('#accountPassword').value = '';
+      accountMsg.classList.add('ok');
+      accountMsg.textContent = 'Password changed.';
+    } catch (error) {
+      accountMsg.textContent = error.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('#deleteAccountBtn').addEventListener('click', async () => {
+    const confirmText = prompt('This permanently deletes your account, projects, stills, clips, and credit history. Type DELETE to confirm.');
+    if (confirmText?.trim().toUpperCase() !== 'DELETE') return;
+    const btn = $('#deleteAccountBtn');
+    btn.disabled = true;
+    try {
+      await requestJSON('/api/account/delete', { confirm: 'DELETE' });
+      closeAccount();
+      await endSession();
+      setStatus('Your account was deleted.');
+    } catch (error) {
+      btn.disabled = false;
+      alert(error.message);
+    }
+  });
+
+
+  function renderStory(project){
+    const doc = $('#storyDoc');
+    doc.replaceChildren();
+    doc.append(el('p', 'doc-logline', project.logline));
+
+    const tags = el('div', 'doc-tags');
+    project.genres.forEach(genre => tags.append(el('span', 'doc-tag', genre)));
+    tags.append(el('span', 'doc-tag', `${project.durationSeconds}s`));
+    tags.append(el('span', 'doc-tag', `${project.shots.length} shots`));
+    tags.append(el('span', 'doc-tag', project.mode === 'advanced' ? 'Advanced cinematic' : 'Basic'));
+    doc.append(tags);
+
+    if (project.synopsis) doc.append(el('p', null, project.synopsis));
+    doc.append(el('p', 'doc-brief', project.prompt));
+  }
+
+  function renderScript(project){
+    const doc = $('#scriptDoc');
+    doc.replaceChildren();
+
+    project.scenes.forEach(scene => {
+      const block = el('div', 'script-scene');
+      block.append(el('p', 'script-slug', scene.heading));
+      if (scene.action) block.append(el('p', 'script-action', scene.action));
+
+      scene.dialogue.forEach(line => {
+        const group = el('div', 'script-line');
+        group.append(el('p', 'script-char', line.character));
+        if (line.parenthetical) group.append(el('p', 'script-paren', `(${line.parenthetical})`));
+        group.append(el('p', 'script-dialogue', line.line));
+        block.append(group);
+      });
+
+      doc.append(block);
+    });
+  }
+
+  function renderStoryboard(project){
+    const grid = $('#storyboardGrid');
+    grid.replaceChildren();
+
+    project.shots.forEach(shot => {
+      const card = el('div', 'shot-card');
+      card.dataset.shot = shot.number;
+
+      const thumb = el('div', 'shot-thumb');
+      thumb.append(el('span', 'shot-num', String(shot.number).padStart(2, '0')));
+
+      const info = el('div', 'shot-info');
+      info.append(el('p', 'shot-type', shot.shotType));
+      info.append(el('p', null, shot.description));
+      info.append(el('p', 'shot-meta', `${shot.camera} · ${shot.lighting} · ${shot.durationSeconds}s`));
+
+      card.append(thumb, info);
+      card.addEventListener('click', () => selectShot(shot.number));
+      grid.append(card);
+
+      if (shot.frameKey) paintThumb(thumb, `/api/frame/${shot.frameKey}`, 400, 220);
+    });
+
+    $('#storyboardEmpty').style.display = project.shots.length ? 'none' : '';
+  }
+
+  function renderTimeline(){
+    const track = $('#timelineVideo');
+    track.replaceChildren();
+    if (!state.project) return;
+
+    state.project.shots.forEach(shot => {
+      const label = `Shot ${String(shot.number).padStart(2, '0')}`;
+      const clip = el('div', 'tl-clip', shot.clipKey ? `▶ ${label}` : label);
+      clip.style.minWidth = `${Math.max(70, shot.durationSeconds * 16)}px`;
+      if (!shot.frameKey) clip.classList.add('pending');
+      if (shot.clipKey) clip.classList.add('rendered');
+      else if (shot.renderStatus === 'queued' || shot.renderStatus === 'running') clip.classList.add('rendering');
+      clip.addEventListener('click', () => selectShot(shot.number));
+      track.append(clip);
+    });
+  }
+
+  const LOOK_OPTIONS = {
+    camera: ['Static', 'Slow push-in', 'Handheld track', 'Slow pan'],
+    lighting: ['Neon spill', 'Backlit', 'Rim light', 'Practical lamp'],
+    mood: ['Tense', 'Tender', 'Ominous', 'Hopeful'],
+  };
+
+  function renderControls(){
+    const panel = $('#shotControls');
+    panel.replaceChildren();
+
+    const shot = state.project?.shots.find(candidate => candidate.number === state.selected);
+    if (!shot){
+      $('#shotControlsTitle').textContent = 'Shot controls';
+      panel.append(el('p', 'shot-meta', 'No shot selected.'));
+      return;
+    }
+
+    $('#shotControlsTitle').textContent = `Shot ${String(shot.number).padStart(2, '0')} — controls`;
+
+    Object.keys(LOOK_OPTIONS).forEach(kind => {
+      const row = el('div', 'control-row');
+      row.append(el('label', null, kind[0].toUpperCase() + kind.slice(1)));
+
+      const group = el('div', 'pill-group');
+      const chosen = state.overrides[kind] || shot[kind];
+      const values = [...new Set([shot[kind], ...LOOK_OPTIONS[kind]])].slice(0, 4);
+
+      values.forEach(value => {
+        const pill = el('div', value === chosen ? 'pill on' : 'pill', value);
+        pill.addEventListener('click', () => {
+          state.overrides[kind] = value;
+          renderControls();
+        });
+        group.append(pill);
+      });
+
+      row.append(group);
+      panel.append(row);
+    });
+
+    const durationRow = el('div', 'control-row');
+    durationRow.append(el('label', null, 'Duration'));
+    const durationGroup = el('div', 'pill-group');
+    [...new Set([shot.durationSeconds, 3, 5, 8])].sort((a, b) => a - b).slice(0, 4).forEach(seconds => {
+      const pill = el('div', seconds === shot.durationSeconds ? 'pill on' : 'pill', `${seconds}s`);
+      pill.addEventListener('click', () => {
+        shot.durationSeconds = seconds;
+        renderControls();
+        renderTimeline();
+      });
+      durationGroup.append(pill);
+    });
+    durationRow.append(durationGroup);
+    panel.append(durationRow);
+  }
+
+  function selectShot(number){
+    state.selected = number;
+    state.overrides = {};
+    $$('.shot-card').forEach(card => card.classList.toggle('selected', Number(card.dataset.shot) === number));
+    renderControls();
+    renderShotActions();
+  }
+
+  function currentShot(){
+    return state.project?.shots.find(candidate => candidate.number === state.selected) || null;
+  }
+
+  function ownsProject(){
+    return Boolean(state.project && session.user && state.project.ownerId === session.user.id);
+  }
+
+  /* ---------- video renders ---------- */
+
+  function renderShotActions(){
+    const button = $('#renderShotBtn');
+    const note = $('#renderNote');
+    const holder = $('#clipHolder');
+    holder.replaceChildren();
+    note.classList.remove('error');
+
+    const shot = currentShot();
+    if (!shot){
+      button.hidden = true;
+      note.textContent = '';
+      return;
+    }
+
+    button.hidden = false;
+
+    if (shot.clipKey){
+      const video = el('video', 'clip-player');
+      video.src = `/api/clip/${shot.clipKey}`;
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      holder.append(video);
+    }
+
+    const rendering = shot.renderStatus === 'queued' || shot.renderStatus === 'running';
+    button.textContent = `${shot.clipKey ? 'Render again' : 'Render video'} — ${session.costs.video} credits`;
+    button.disabled = !ownsProject() || !shot.frameKey || rendering;
+
+    if (!session.user) note.textContent = 'Sign in to render this shot as video.';
+    else if (!ownsProject()) note.textContent = 'Only the director who generated this film can render it.';
+    else if (!shot.frameKey) note.textContent = 'Generate the still first — the clip is animated from it.';
+    else if (rendering) note.textContent = 'Rendering in the background. This can take a few minutes; you can keep working.';
+    else if (shot.renderError){ note.textContent = shot.renderError; note.classList.add('error'); }
+    else note.textContent = '';
+  }
+
+  const renderPolls = new Set();
+
+  function watchRender(jobId, projectId, shotNumber){
+    if (!jobId || renderPolls.has(jobId)) return;
+    renderPolls.add(jobId);
+
+    const deadline = Date.now() + 14 * 60 * 1000;
+
+    // Only touches the shot if that project is still the one on screen.
+    const apply = (patch) => {
+      if (state.project?.id !== projectId) return;
+      const shot = state.project.shots.find(candidate => candidate.number === shotNumber);
+      if (!shot) return;
+      Object.assign(shot, patch);
+      renderShotActions();
+      renderTimeline();
+    };
+
+    const tick = async () => {
+      if (Date.now() > deadline){
+        renderPolls.delete(jobId);
+        apply({ renderStatus: 'failed', renderError: 'Stopped watching this render. Reopen the project to check on it.' });
+        return;
+      }
+
+      let job;
+      try {
+        job = await requestJSON(`/api/render/${jobId}`);
+      } catch (error) {
+        renderPolls.delete(jobId);
+        return;
+      }
+
+      if (job.status === 'succeeded'){
+        renderPolls.delete(jobId);
+        apply({
+          renderStatus: 'succeeded',
+          renderError: null,
+          clipKey: job.clipUrl ? job.clipUrl.split('/').pop() : null,
+        });
+        setStatus(`Shot ${String(shotNumber).padStart(2, '0')} rendered.`);
+        return;
+      }
+
+      if (job.status === 'failed'){
+        renderPolls.delete(jobId);
+        apply({
+          renderStatus: 'failed',
+          renderError: `${job.error || 'The render failed.'} Your credits were refunded.`,
+        });
+        refreshSession();
+        return;
+      }
+
+      apply({ renderStatus: job.status });
+      setTimeout(tick, 5000);
+    };
+
+    setTimeout(tick, 4000);
+  }
+
+  $('#renderShotBtn').addEventListener('click', async () => {
+    const project = state.project;
+    const shot = currentShot();
+    if (!project || !shot) return;
+    if (!session.user){ openAuth('login', 'Sign in to render video.'); return; }
+
+    const note = $('#renderNote');
+    $('#renderShotBtn').disabled = true;
+    note.classList.remove('error');
+    note.textContent = 'Queueing the render…';
+
+    try {
+      const data = await requestJSON(`/api/render/${project.id}`, { shot: shot.number });
+      shot.renderStatus = data.status || 'queued';
+      shot.renderJobId = data.jobId;
+      shot.renderError = null;
+      setBalance(data.balance);
+      renderShotActions();
+      renderTimeline();
+      watchRender(data.jobId, project.id, shot.number);
+    } catch (error) {
+      shot.renderError = error.message;
+      renderShotActions();
+      if (error.data?.insufficientCredits) setStatus(error.message, true);
+    }
+  });
+
+  /* ---------- publishing ---------- */
+
+  function renderPublishButton(){
+    const button = $('#publishBtn');
+    const project = state.project;
+
+    if (!ownsProject()){
+      button.hidden = true;
+      return;
+    }
+
+    button.hidden = false;
+    button.textContent = project.published ? 'Withdraw from marketplace' : 'Submit to marketplace';
+    button.classList.toggle('btn-solid', !project.published);
+  }
+
+  $('#publishBtn').addEventListener('click', async () => {
+    const project = state.project;
+    if (!project) return;
+
+    const button = $('#publishBtn');
+    button.disabled = true;
+    try {
+      const data = await requestJSON(
+        `/api/project/${project.id}/publish`,
+        {},
+        project.published ? 'DELETE' : 'POST',
+      );
+      project.published = data.published;
+      renderPublishButton();
+      setStatus(data.published
+        ? `“${project.title}” is in the marketplace — registered viewers can vote on it.`
+        : `“${project.title}” withdrawn from the marketplace.`);
+      loadMarketplace();
+    } catch (error) {
+      setStatus(error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  function loadProject(project){
+    state.project = project;
+    state.selected = project.shots[0]?.number || 1;
+    state.overrides = {};
+
+    $('#wsTitle').textContent = project.title;
+    $('#wsScene').textContent = `SCENE 1 · ${project.sceneHeading}`;
+
+    const owned = ownsProject();
+    generateAllBtn.hidden = !owned;
+    generateShotBtn.hidden = !owned;
+
+    renderStory(project);
+    renderScript(project);
+    renderStoryboard(project);
+    renderTimeline();
+    renderPublishButton();
+    selectShot(state.selected);
+    rememberProject(project);
+
+    // A clip queued in an earlier visit may still be running.
+    project.shots
+      .filter(shot => shot.renderJobId && (shot.renderStatus === 'queued' || shot.renderStatus === 'running'))
+      .forEach(shot => watchRender(shot.renderJobId, project.id, shot.number));
+  }
+
+  /* ---------- frame generation ---------- */
+
+  const generateAllBtn = $('#generateAllBtn');
+  const generateShotBtn = $('#generateShotBtn');
+
+  async function generateFrame(number, overrides){
+    const project = state.project;
+    if (!project) return;
+
+    const thumb = $(`.shot-card[data-shot="${number}"] .shot-thumb`);
+    thumb?.classList.add('thumb-pending');
+    thumb?.querySelector('.shot-fail')?.remove();
+
+    try {
+      const data = await requestJSON('/api/generate-frame', {
+        projectId: project.id,
+        shot: number,
+        ...(overrides || {}),
+      });
+
+      const shot = project.shots.find(candidate => candidate.number === number);
+      if (shot) shot.frameKey = data.key;
+      if (thumb) paintThumb(thumb, data.frameUrl, 400, 220);
+      setBalance(data.balance);
+      renderTimeline();
+      renderShotActions();
+      rememberProject(project);
+      return true;
+    } catch (error) {
+      thumb?.append(el('div', 'shot-fail', error.data?.insufficientCredits ? 'Out of credits' : 'Frame failed — regenerate this shot'));
+      if (error.data?.insufficientCredits){
+        setBalance(error.data.balance);
+        setStatus(`${error.message} Add credits to keep boarding.`, true);
+      }
+      return false;
+    } finally {
+      thumb?.classList.remove('thumb-pending');
+    }
+  }
+
+  async function generateFrames(force){
+    const project = state.project;
+    if (!project || state.busy || !ownsProject()) return;
+
+    const queue = project.shots
+      .filter(shot => force || !shot.frameKey)
+      .map(shot => shot.number);
+    if (!queue.length) return;
+
+    const total = queue.length;
+    let done = 0;
+    state.busy = true;
+    generateAllBtn.disabled = true;
+    generateShotBtn.disabled = true;
+    generateAllBtn.textContent = `Generating 0/${total}…`;
+    setStatus(`Generating ${total} storyboard frames — ${session.costs.frame} credits each…`);
+    setRail(3, 4);
+
+    // Three at a time: fast enough to feel live, gentle on the image model.
+    const workers = Array.from({ length: Math.min(3, total) }, async () => {
+      while (queue.length){
+        // The server is the authority on the balance; stop before it says no.
+        if (session.balance < session.costs.frame){
+          queue.length = 0;
+          break;
+        }
+        await generateFrame(queue.shift());
+        done += 1;
+        generateAllBtn.textContent = `Generating ${done}/${total}…`;
+      }
+    });
+
+    await Promise.all(workers);
+
+    state.busy = false;
+    generateAllBtn.disabled = false;
+    generateShotBtn.disabled = false;
+    generateAllBtn.textContent = 'Generate all shots';
+    const boarded = project.shots.filter(shot => shot.frameKey).length;
+    setStatus(boarded === project.shots.length
+      ? `“${project.title}” — storyboard complete.`
+      : `“${project.title}” — ${boarded} of ${project.shots.length} shots boarded. Add credits to finish.`);
+    setRail(4, 5);
+  }
+
+  generateAllBtn.addEventListener('click', () => generateFrames(true));
+  generateShotBtn.addEventListener('click', async () => {
+    if (!state.project || state.busy) return;
+    generateShotBtn.disabled = true;
+    await generateFrame(state.selected, state.overrides);
+    generateShotBtn.disabled = false;
+  });
+
+  /* ---------- recent projects ---------- */
+
+  const RECENTS_KEY = 'cinepay.recents';
+
+  function readRecents(){
+    try { return JSON.parse(localStorage.getItem(RECENTS_KEY)) || []; }
+    catch { return []; }
+  }
+
+  function rememberProject(project){
+    const entry = {
+      id: project.id,
+      title: project.title,
+      genres: project.genres,
+      durationSeconds: project.durationSeconds,
+      shots: project.shots.length,
+      framed: project.shots.filter(shot => shot.frameKey).length,
+      frameKey: project.shots.find(shot => shot.frameKey)?.frameKey || null,
+    };
+
+    const recents = [entry, ...readRecents().filter(item => item.id !== project.id)].slice(0, 6);
+    try { localStorage.setItem(RECENTS_KEY, JSON.stringify(recents)); } catch (error) {}
+    renderRecents();
+  }
+
+  function renderRecents(){
+    const grid = $('#projectGrid');
+    $$('.recent-card', grid).forEach(card => card.remove());
+
+    readRecents().slice().reverse().forEach(entry => {
+      const card = el('div', 'card recent-card');
+
+      const thumb = el('div', 'card-thumb');
+      thumb.append(el('span', 'status', `${entry.framed} of ${entry.shots} shots generated`));
+
+      const body = el('div', 'card-body');
+      body.append(el('p', 'card-title', entry.title));
+      body.append(el('p', 'card-meta', `${(entry.genres || []).join(' · ') || 'Original'} · ${entry.durationSeconds}s`));
+
+      card.append(thumb, body);
+      card.addEventListener('click', () => openProject(entry.id));
+      grid.prepend(card);
+
+      if (entry.frameKey) paintThumb(thumb, `/api/frame/${entry.frameKey}`, 460, 260);
+    });
+  }
+
+  async function openProject(id){
+    setStatus('Loading project…');
+    try {
+      const { project } = await requestJSON(`/api/story/${id}`);
+      loadProject(project);
+      openWorkspace();
+      setStatus(`“${project.title}” loaded.`);
+      generateFrames(false);
+      return true;
+    } catch (error) {
+      setStatus('That project could not be loaded.', true);
+      return false;
+    }
+  }
+
+  /* ---------- the brief ---------- */
+
+  async function runBrief(brief, options){
+    if (state.busy || !brief.trim()) return;
+
+    if (!session.user){
+      openAuth('signup', 'Create an account to generate a film — it opens with 250 free credits.');
+      return;
+    }
+
+    state.busy = true;
+    composer.classList.add('busy');
+    generateBtn.disabled = true;
+    setStatus('Breaking the story — logline, script, then the shot list…');
+    setRail(0, 1);
+
+    try {
+      const { project, balance } = await requestJSON('/api/generate-story', { prompt: brief.trim(), mode: state.mode });
+      setBalance(balance);
+      setRail(3, 3);
+      setStatus(`“${project.title}” — ${project.shots.length} shots boarded.`);
+      if (options?.demoSlug){
+        try { localStorage.setItem(`cinepay.demo.${options.demoSlug}`, project.id); } catch (error) {}
+      }
+      state.busy = false;
+      loadProject(project);
+      openWorkspace();
+      generateFrames(false);
+    } catch (error) {
+      if (error.status === 401){
+        openAuth('login', error.message);
+        setStatus('');
+      } else {
+        setStatus(error.message || 'Story generation failed. Try again.', true);
+      }
+      if (error.data?.insufficientCredits) setBalance(error.data.balance);
+      setRail(0, 0);
+      state.busy = false;
+    } finally {
+      composer.classList.remove('busy');
+      generateBtn.disabled = false;
+    }
+  }
+
+  generateBtn.addEventListener('click', () => runBrief(briefInput.value));
+
+  $$('.chip').forEach(chip => chip.addEventListener('click', () => {
+    briefInput.value = chip.textContent.trim();
+    briefInput.focus();
+  }));
+
+  $$('.sample-card').forEach(card => card.addEventListener('click', async () => {
+    const slug = card.dataset.slug;
+    const cached = localStorage.getItem(`cinepay.demo.${slug}`);
+    briefInput.value = card.dataset.brief;
+    if (cached && await openProject(cached)) return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    runBrief(card.dataset.brief, { demoSlug: slug });
+  }));
+
+  const modeButtons = $$('.mode-toggle button');
+  modeButtons.forEach(button => button.addEventListener('click', () => {
+    modeButtons.forEach(other => other.classList.remove('active'));
+    button.classList.add('active');
+    state.mode = button.dataset.mode;
+  }));
+
+  /* ---------- navigation ---------- */
 
   function openWorkspace(){
     document.body.classList.add('workspace-mode');
-    document.getElementById('workspace').classList.add('active');
-    window.scrollTo(0,0);
+    $('#workspace').classList.add('active');
+    window.scrollTo(0, 0);
   }
   function closeWorkspace(){
     document.body.classList.remove('workspace-mode');
-    document.getElementById('workspace').classList.remove('active');
+    $('#workspace').classList.remove('active');
   }
-  document.getElementById('openWorkspaceBtn').addEventListener('click', openWorkspace);
-  document.getElementById('openWorkspaceCard').addEventListener('click', openWorkspace);
-  document.getElementById('generateBtn').addEventListener('click', openWorkspace);
-  document.getElementById('backLink').addEventListener('click', closeWorkspace);
 
-  document.querySelectorAll('.vote-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (btn.classList.contains('voted')) return;
-      btn.classList.add('voted');
-      const countEl = btn.querySelector('.vcount');
-      const current = parseInt(btn.dataset.votes.replace(/,/g,''), 10);
-      const next = current + 1;
-      btn.dataset.votes = next;
-      countEl.textContent = next.toLocaleString();
-    });
-  });
-
-  document.getElementById('navMarketplace').addEventListener('click', (e) => {
-    e.preventDefault();
+  $('#openWorkspaceBtn').addEventListener('click', () => {
     closeWorkspace();
-    document.getElementById('marketplaceSection').scrollIntoView({behavior:'smooth'});
+    briefInput.focus();
+    briefInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
-  document.getElementById('navCredits').addEventListener('click', (e) => {
-    e.preventDefault();
+  $('#backLink').addEventListener('click', closeWorkspace);
+
+  $$('.wsitem[data-view]').forEach(item => item.addEventListener('click', () => {
+    $$('.wsitem').forEach(other => other.classList.remove('active'));
+    item.classList.add('active');
+    const target = `view${item.dataset.view[0].toUpperCase()}${item.dataset.view.slice(1)}`;
+    $$('.ws-view').forEach(view => view.classList.toggle('active', view.id === target));
+  }));
+
+  $('#navMarketplace').addEventListener('click', (event) => {
+    event.preventDefault();
     closeWorkspace();
-    document.getElementById('creditsSection').scrollIntoView({behavior:'smooth'});
+    $('#marketplaceSection').scrollIntoView({ behavior: 'smooth' });
+  });
+  $('#navCredits').addEventListener('click', (event) => {
+    event.preventDefault();
+    closeWorkspace();
+    $('#creditsSection').scrollIntoView({ behavior: 'smooth' });
   });
 
-  document.querySelectorAll('.genre-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.genre-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      const genre = tab.dataset.genre;
-      document.querySelectorAll('.mv-card').forEach(card => {
-        const tags = card.dataset.genre || '';
-        card.style.display = (genre === 'all' || tags.includes(genre)) ? '' : 'none';
-      });
+  /* ---------- marketplace ---------- */
+
+  const SAMPLE_NOTE = 'No films have been submitted yet, so the cards below are samples with placeholder counts and voting closed. Generate a film, board its first shot, and submit it from the workspace — real voting opens the moment one is published.';
+
+  // Until a real film is published the section keeps its sample cards, but they
+  // are inert: a vote has to be a row in the database owned by an account.
+  function disableSampleVoting(){
+    $$('#marketGrid .vote-btn').forEach(button => {
+      button.classList.add('sample');
+      button.classList.remove('voted');
+      button.disabled = true;
+      button.title = 'Sample card — publish a real film to open voting';
     });
-  });
-</script>
+  }
+
+  function genreTags(film){
+    return (film.genres || []).join(' ').toLowerCase().replace(/sci-?fi/g, 'scifi');
+  }
+
+  function voteButton(film){
+    const button = el('button', film.viewerVoted ? 'vote-btn voted' : 'vote-btn');
+    const count = el('span', 'vcount', money(film.votes));
+    button.append(el('span', null, '▲'), document.createTextNode(' '), count);
+
+    button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      if (!session.user){
+        openAuth('login', 'Sign in to vote. Voting is free for every registered viewer.');
+        return;
+      }
+
+      const voted = button.classList.contains('voted');
+      button.disabled = true;
+      try {
+        const data = await requestJSON(`/api/vote/${film.id}`, {}, voted ? 'DELETE' : 'POST');
+        film.viewerVoted = data.voted;
+        film.votes = data.votes;
+        button.classList.toggle('voted', data.voted);
+        count.textContent = money(data.votes);
+        const tally = $(`.lb-card[data-film="${film.id}"] .lb-votes b`);
+        if (tally) tally.textContent = money(data.votes);
+      } catch (error) {
+        if (error.status === 401) openAuth('login', error.message);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    return button;
+  }
+
+  function marketCard(film){
+    const card = el('div', 'mv-card');
+    card.dataset.genre = genreTags(film);
+
+    const thumb = el('div', 'mv-thumb');
+    const badge = el('span', 'preview-badge');
+    badge.append(el('span', 'dot'), document.createTextNode('Preview'));
+    thumb.append(badge);
+
+    const body = el('div', 'mv-body');
+    body.append(el('p', 'mv-title', film.title));
+    body.append(el('p', 'mv-creator', `by ${film.creator || 'an anonymous director'}`));
+
+    const footer = el('div', 'mv-footer');
+    footer.append(voteButton(film));
+    footer.append(el('span', 'mv-meta', `${film.durationSeconds}s · ${(film.genres || [])[0] || 'Original'}`));
+    body.append(footer);
+
+    card.append(thumb, body);
+    card.addEventListener('click', () => openProject(film.id));
+    if (film.frameUrl) paintThumb(thumb, film.frameUrl, 440, 248);
+    return card;
+  }
+
+  function leaderboardCard(film, rank){
+    const card = el('div', 'lb-card');
+    card.dataset.film = film.id;
+
+    const thumb = el('div', 'lb-thumb');
+    const body = el('div', 'lb-body');
+    body.append(el('p', 'lb-title', film.title));
+
+    const votes = el('p', 'lb-votes');
+    votes.append(el('b', null, money(film.votes)), document.createTextNode(' votes'));
+    body.append(votes);
+
+    card.append(el('div', 'lb-rank', String(rank)), thumb, body);
+    card.addEventListener('click', () => openProject(film.id));
+    if (film.frameUrl) paintThumb(thumb, film.frameUrl, 340, 200);
+    return card;
+  }
+
+  async function loadMarketplace(){
+    const note = $('#marketNote');
+    const grid = $('#marketGrid');
+    const board = $('#leaderboard');
+
+    let data;
+    try {
+      data = await requestJSON('/api/marketplace');
+    } catch (error) {
+      note.hidden = false;
+      note.textContent = 'The marketplace could not be reached, so the cards below are samples with voting closed.';
+      return;
+    }
+
+    if (!data.films.length){
+      note.hidden = false;
+      note.textContent = SAMPLE_NOTE;
+      return;
+    }
+
+    const many = data.films.length !== 1;
+    note.hidden = false;
+    note.textContent = `${data.films.length} published film${many ? 's' : ''}, ranked by live vote count — one vote per registered viewer, per film.`;
+
+    delete grid.dataset.sample;
+    delete board.dataset.sample;
+    grid.replaceChildren();
+    board.replaceChildren();
+
+    data.films.forEach((film, index) => {
+      if (index < 5) board.append(leaderboardCard(film, index + 1));
+      grid.append(marketCard(film));
+    });
+  }
+
+  /* ---------- credit packs ---------- */
+
+  $$('.pack-btn').forEach(button => button.addEventListener('click', async () => {
+    const note = button.parentElement.querySelector('.pack-note');
+
+    if (!session.user){
+      openAuth('signup', 'Create an account to hold credits.');
+      return;
+    }
+
+    button.disabled = true;
+    note.textContent = 'Starting checkout…';
+    try {
+      const data = await requestJSON('/api/credits/checkout', { pack: button.dataset.pack });
+      if (data.checkout && data.url){
+        // Real Stripe Checkout: leave the page; credits land via the webhook.
+        window.location.href = data.url;
+        return;
+      }
+      setBalance(data.balance);
+      note.textContent = `${money(data.credits)} credits added. ${data.notice}`;
+    } catch (error) {
+      note.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  }));
+
+  $$('.genre-tab').forEach(tab => tab.addEventListener('click', () => {
+    $$('.genre-tab').forEach(other => other.classList.remove('active'));
+    tab.classList.add('active');
+    const genre = tab.dataset.genre;
+    $$('.mv-card').forEach(card => {
+      const tags = card.dataset.genre || '';
+      card.style.display = (genre === 'all' || tags.includes(genre)) ? '' : 'none';
+    });
+  }));
+
+  renderRecents();
+  renderControls();
+  renderSession();
+  disableSampleVoting();
+  refreshSession();
+  loadMarketplace();
+  loadIdentitySettings();
+  processAuthCallback();
+ </script>
 
 </body>
 </html>
