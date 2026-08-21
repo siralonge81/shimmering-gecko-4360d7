@@ -32,7 +32,9 @@ export async function finishJob(jobId: string, patch: TerminalPatch): Promise<bo
   const [job] = updated
   if (!job) return false
 
-  if (patch.status === 'failed' && job.creditsHeld > 0) {
+  // Anonymous renders spend no credits (the trial is free), so there is nothing
+  // to refund and no ledger row to write against a null user.
+  if (patch.status === 'failed' && job.userId && job.creditsHeld > 0) {
     await grant(job.userId, job.creditsHeld, 'refund', 'Refund — video render failed', jobId)
   }
 

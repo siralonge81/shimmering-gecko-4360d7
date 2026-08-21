@@ -1,21 +1,39 @@
 import type { Config, Context } from '@netlify/functions'
-import { currentUser } from '../lib/auth.mts'
+import {
+  ANON_GENERATION_LIMIT,
+  currentUser,
+  readAnonymousSession,
+  remainingGenerations,
+} from '../lib/auth.mts'
 import { CREDIT_COSTS, balanceFor, recentLedger } from '../lib/credits.mts'
-import { listProjectsForUser } from '../lib/projects.mts'
+import { listProjectsForAnonymousSession, listProjectsForUser } from '../lib/projects.mts'
 
 /**
  * One call the page can make on load: who is signed in, what they can spend,
- * and what they have made. Signed-out is a 200 with a null user, not a 401 —
- * the landing page is public.
+ * and what they have made. Signed-out visitors also learn how many free trial
+ * generations they have left and which projects their anonymous session owns.
  */
-export default async (_req: Request, _context: Context) => {
+export default async (_req: Request, context: Context) => {
   const user = await currentUser()
 
   if (!user) {
+    const anonymousSession = await readAnonymousSession(context)
+    // A visitor with no trial cookie yet has the full allowance ahead of them;
+    // only an existing session has spent any of it.
+    const anonymousRemaining = anonymousSession
+      ? remainingGenerations(anonymousSession)
+      : ANON_GENERATION_LIMIT
+    const anonymousProjects = anonymousSession
+      ? await listProjectsForAnonymousSession(anonymousSession.id).catch(() => [])
+      : []
+
     return Response.json({
       user: null,
       costs: CREDIT_COSTS,
       paymentsConfigured: Boolean(Netlify.env.get('STRIPE_SECRET_KEY')),
+      anonymousRemaining,
+      anonymousLimit: ANON_GENERATION_LIMIT,
+      anonymousProjects,
     })
   }
 

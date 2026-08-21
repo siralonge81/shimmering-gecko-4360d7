@@ -1,5 +1,5 @@
 import type { Config, Context } from '@netlify/functions'
-import { currentUser } from '../lib/auth.mts'
+import { currentUser, readAnonymousSession } from '../lib/auth.mts'
 import { loadProject } from '../lib/projects.mts'
 
 export default async (_req: Request, context: Context) => {
@@ -11,7 +11,14 @@ export default async (_req: Request, context: Context) => {
   }
 
   const user = await currentUser()
-  const isOwner = Boolean(user && project.ownerId === user.id)
+  const anonymousSession = await readAnonymousSession(context)
+
+  // Ownership covers both account-backed and anonymous-trial projects: a signed-
+  // in director matches their user id, an anonymous visitor matches the trial
+  // session the project was generated against.
+  const isOwner =
+    Boolean(user && project.ownerId === user.id) ||
+    Boolean(anonymousSession && project.anonymousSessionId === anonymousSession.id)
 
   // Unpublished work is private to its director.
   if (!project.published && !isOwner) {

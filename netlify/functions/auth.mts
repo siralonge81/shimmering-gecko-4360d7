@@ -1,6 +1,6 @@
 import type { Config, Context } from '@netlify/functions'
 import { AuthError, getSettings, login, logout, signup, verifyRequestOrigin } from '@netlify/identity'
-import { currentUser } from '../lib/auth.mts'
+import { claimAnonymousSession, currentUser } from '../lib/auth.mts'
 import { balanceFor } from '../lib/credits.mts'
 
 /**
@@ -75,9 +75,14 @@ export default async (req: Request, context: Context) => {
       return Response.json({ error: 'Signed in, but the session did not stick.' }, { status: 500 })
     }
 
+    // This is the "save" moment: any film the visitor made while signed out is
+    // re-parented onto their account so it survives and shows up in /api/me.
+    const { projectsClaimed } = await claimAnonymousSession(context, user)
+
     return Response.json({
       user: { id: user.id, email: user.email, displayName: user.displayName },
       balance: await balanceFor(user.id),
+      projectsClaimed,
     })
   } catch (error) {
     if (error instanceof AuthError) {
