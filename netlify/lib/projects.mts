@@ -4,10 +4,15 @@ import { projects, renderJobs, scenes, shots, votes } from '../../db/schema.js'
 import type { Dialogue, FilmProject, Scene, Shot } from './film.mts'
 
 /** Writes a freshly generated plan out across projects/scenes/shots. */
-export async function saveProject(userId: string, plan: FilmProject): Promise<void> {
+export async function saveProject(
+  ownerId: string | null,
+  plan: FilmProject,
+  opts: { anonymousSessionId?: string | null } = {},
+): Promise<void> {
   await db.insert(projects).values({
     id: plan.id,
-    userId,
+    userId: ownerId,
+    anonymousSessionId: opts.anonymousSessionId ?? null,
     title: plan.title,
     logline: plan.logline,
     synopsis: plan.synopsis,
@@ -55,6 +60,7 @@ export type LoadedShot = Shot & {
 
 export type LoadedProject = FilmProject & {
   ownerId: string | null
+  anonymousSessionId: string | null
   published: boolean
   voteCount: number
   shots: LoadedShot[]
@@ -126,6 +132,7 @@ export async function loadProject(projectId: string): Promise<LoadedProject | nu
       }
     }),
     ownerId: row.userId,
+    anonymousSessionId: row.anonymousSessionId,
     published: row.published,
     voteCount: voteRow?.count ?? 0,
   }
@@ -161,6 +168,31 @@ export async function listProjectsForUser(userId: string) {
     })
     .from(projects)
     .where(eq(projects.userId, userId))
+    .orderBy(sql`${projects.createdAt} desc`)
+    .limit(24)
+}
+
+/** All projects belonging to an anonymous trial session (claimed at sign-in). */
+export async function listProjectsForAnonymousSession(sessionId: string) {
+  return db
+    .select({
+      id: projects.id,
+      title: projects.title,
+      genres: projects.genres,
+      durationSeconds: projects.durationSeconds,
+      framed: sql<number>`(
+        select count(*)::int from ${shots}
+        where ${shots.projectId} = ${projects.id} and ${shots.frameKey} is not null
+      )`,
+      shotCount: sql<number>`(select count(*)::int from ${shots} where ${shots.projectId} = ${projects.id})`,
+      frameKey: sql<string>`(
+        select ${shots.frameKey} from ${shots}
+        where ${shots.projectId} = ${projects.id} and ${shots.frameKey} is not null
+        order by ${shots.number} asc limit 1
+      )`,
+    })
+    .from(projects)
+    .where(eq(projects.anonymousSessionId, sessionId))
     .orderBy(sql`${projects.createdAt} desc`)
     .limit(24)
 }

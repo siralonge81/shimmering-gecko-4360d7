@@ -1,6 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { Config, Context } from '@netlify/functions'
-import { currentUser, unauthorized } from '../lib/auth.mts'
+import { sql } from 'drizzle-orm'
+import { db } from '../../db/index.js'
+import { anonymousSessions } from '../../db/schema.js'
+import {
+  ANON_GENERATION_LIMIT,
+  currentUser,
+  consumeAnonymousGeneration,
+  getOrCreateAnonymousSession,
+  remainingGenerations,
+  unauthorized,
+} from '../lib/auth.mts'
 import { CREDIT_COSTS, InsufficientCreditsError, grant, spend } from '../lib/credits.mts'
 import { normalizePlan } from '../lib/film.mts'
 import { checkRateLimit, sweepRateBuckets } from '../lib/rate-limit.mts'
@@ -90,13 +100,32 @@ const PLAN_TOOL: Anthropic.Tool = {
   },
 }
 
-export default async (req: Request, _context: Context) => {
+export default async (req: Request, context: Context) => {
   const user = await currentUser()
-  if (!user) return unauthorized('Sign in to generate a film.')
+
+  // Anonymous visitors may run up to ANON_GENERATION_LIMIT free generations
+  // before they have to sign in. Signed-in directors keep paying credits.
+  let anonymousSession = null
+  if (!user) {
+    anonymousSession = await getOrCreateAnonymousSession(context)
+    if (!anonymousSession) {
+      return unauthorized('Sign in to generate a film.')
+    }
+    if (remainingGenerations(anonymousSession) <= 0) {
+      return Response.json(
+        {
+          error: `You have used all ${ANON_GENERATION_LIMIT} free generations. Sign in to save your work and keep going.`,
+          requiresAuth: true,
+          freeTrialExhausted: true,
+        },
+        { status: 401 },
+      )
+    }
+  }
 
   // Meter before charging: an abusive caller should be refused before any
   // model call or ledger write.
-  const limited = await checkRateLimit(req, 'story', user.identityId)
+  const limited = await checkRateLimit(req, 'story', user?.identityId ?? null)
   if (limited) return limited
   void sweepRateBuckets()
 
@@ -121,30 +150,47 @@ export default async (req: Request, _context: Context) => {
   const mode = body.mode === 'advanced' ? 'advanced' : 'basic'
   const projectId = crypto.randomUUID()
 
-  // Charged up front so a balance cannot be spent twice by parallel requests;
-  // refunded below if the model never delivers a plan.
-  let balance: number
-  try {
-    balance = await spend(
-      user.id,
-      CREDIT_COSTS.story,
-      'story',
-      `Story, script and shot list — ${mode}`,
-      projectId,
-    )
-  } catch (error) {
-    if (error instanceof InsufficientCreditsError) {
+  // Charge before the model call: credits for a signed-in director, or a free
+  // trial slot for an anonymous visitor. Both are spent up front so a parallel
+  // request cannot double-spend, and refunded if the model never delivers.
+  let balance: number | null = null
+  let consumedAnonymous: { generationsUsed: number } | null = null
+  if (user) {
+    try {
+      balance = await spend(
+        user.id,
+        CREDIT_COSTS.story,
+        'story',
+        `Story, script and shot list — ${mode}`,
+        projectId,
+      )
+    } catch (error) {
+      if (error instanceof InsufficientCreditsError) {
+        return Response.json(
+          {
+            error: `That costs ${error.required} credits and you have ${error.balance}.`,
+            insufficientCredits: true,
+            required: error.required,
+            balance: error.balance,
+          },
+          { status: 402 },
+        )
+      }
+      throw error
+    }
+  } else if (anonymousSession) {
+    consumedAnonymous = await consumeAnonymousGeneration(anonymousSession.id)
+    if (!consumedAnonymous) {
+      // A parallel request took the last free slot between the check above and now.
       return Response.json(
         {
-          error: `That costs ${error.required} credits and you have ${error.balance}.`,
-          insufficientCredits: true,
-          required: error.required,
-          balance: error.balance,
+          error: `You have used all ${ANON_GENERATION_LIMIT} free generations. Sign in to save your work and keep going.`,
+          requiresAuth: true,
+          freeTrialExhausted: true,
         },
-        { status: 402 },
+        { status: 401 },
       )
     }
-    throw error
   }
 
   try {
@@ -181,22 +227,54 @@ export default async (req: Request, _context: Context) => {
       throw new Error('The story model returned no shots.')
     }
 
-    await saveProject(user.id, project)
+    await saveProject(user?.id ?? null, project, {
+      anonymousSessionId: anonymousSession?.id ?? null,
+    })
 
-    return Response.json({ project, balance })
+    return Response.json({
+      project,
+      balance,
+      anonymousRemaining: consumedAnonymous
+        ? Math.max(0, ANON_GENERATION_LIMIT - consumedAnonymous.generationsUsed)
+        : null,
+    })
   } catch (error) {
     console.error('generate-story failed:', error)
-    const refunded = await grant(
-      user.id,
-      CREDIT_COSTS.story,
-      'refund',
-      'Refund — story generation failed',
-      projectId,
-    )
+    // Refund the slot/credits the failed attempt consumed.
+    if (user) {
+      const refunded = await grant(
+        user.id,
+        CREDIT_COSTS.story,
+        'refund',
+        'Refund — story generation failed',
+        projectId,
+      )
+      return Response.json(
+        { error: 'Story generation failed. Your credits were refunded.', balance: refunded },
+        { status: 502 },
+      )
+    }
+    // Anonymous: there is no credit to return, but the consumed free slot is
+    // given back so the visitor is not punished for a transient model failure.
+    if (anonymousSession) {
+      await dbRestoreAnonSlot(anonymousSession.id)
+    }
     return Response.json(
-      { error: 'Story generation failed. Your credits were refunded.', balance: refunded },
+      { error: 'Story generation failed. Try again.' },
       { status: 502 },
     )
+  }
+}
+
+/** Returns one free generation slot to an anonymous trial session. */
+async function dbRestoreAnonSlot(sessionId: string): Promise<void> {
+  try {
+    await db
+      .update(anonymousSessions)
+      .set({ generationsUsed: sql`greatest(${anonymousSessions.generationsUsed} - 1, 0)` })
+      .where(sql`${anonymousSessions.id} = ${sessionId}`)
+  } catch (error) {
+    console.error('Could not restore anonymous generation slot:', error)
   }
 }
 

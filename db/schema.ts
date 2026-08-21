@@ -31,11 +31,35 @@ export const users = pgTable(
   ],
 )
 
+/**
+ * Anonymous trial sessions. A first-time visitor who generates a film before
+ * signing in gets one of these; its `id` is the value of the `cinepay.anon`
+ * cookie. Work created against the session (projects, render jobs) is claimed
+ * into a real account the moment the visitor signs in — that claim is what
+ * "saving" a generated video means.
+ */
+export const anonymousSessions = pgTable(
+  'anonymous_sessions',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** How many story generations this session has spent of its free allowance. */
+    generationsUsed: integer('generations_used').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+)
+
 export const projects = pgTable(
   'projects',
   {
     id: uuid().primaryKey().defaultRandom(),
     userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    /**
+     * Set while a film is generated anonymously; cleared (and userId set) when
+     * the session is claimed by an account at sign-in.
+     */
+    anonymousSessionId: uuid('anonymous_session_id').references(() => anonymousSessions.id, {
+      onDelete: 'set null',
+    }),
     slug: text(),
     title: text().notNull(),
     logline: text().notNull().default(''),
@@ -52,6 +76,7 @@ export const projects = pgTable(
   (table) => [
     uniqueIndex('projects_slug_key').on(table.slug),
     index('projects_user_id_idx').on(table.userId),
+    index('projects_anonymous_session_id_idx').on(table.anonymousSessionId),
     index('projects_published_idx').on(table.published),
   ],
 )
@@ -177,9 +202,15 @@ export const renderJobs = pgTable(
     projectId: uuid('project_id')
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    /**
+     * The director who queued the clip. Nullable now: an anonymous visitor can
+     * render before signing in, and the row is claimed with its project at
+     * sign-in. Exactly one of userId / anonymousSessionId is expected to be set.
+     */
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    anonymousSessionId: uuid('anonymous_session_id').references(() => anonymousSessions.id, {
+      onDelete: 'set null',
+    }),
     shotNumber: integer('shot_number'),
     /** queued | running | succeeded | failed | unavailable */
     status: text().notNull().default('queued'),

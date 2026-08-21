@@ -904,6 +904,7 @@
         <div class="proj-scene" id="wsScene">Describe a scene on the dashboard to begin</div>
       </div>
       <div class="ws-actions">
+        <button class="btn btn-solid" id="saveBtn" hidden>Save to your account</button>
         <button class="btn" id="publishBtn" hidden>Submit to marketplace</button>
         <button class="btn" id="generateAllBtn">Generate all shots</button>
       </div>
@@ -958,7 +959,7 @@
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-  const state = { project: null, selected: 1, mode: 'basic', busy: false, overrides: {} };
+  const state = { project: null, selected: 1, mode: 'basic', busy: false, overrides: {}, ownsLoaded: false };
 
   function el(tag, className, text){
     const node = document.createElement(tag);
@@ -1054,8 +1055,17 @@
   /* ---------- account, credits ---------- */
 
   // Everything that costs credits is priced by the server; the page only ever
-  // displays what /api/me reports so the two can never drift.
-  const session = { user: null, balance: 0, costs: { story: 10, frame: 20, video: 120 } };
+  // displays what /api/me reports so the two can never drift. A signed-out
+  // visitor instead has a free trial: a limited number of generations with no
+  // credits, whose work is claimed into an account at sign-in (that claim is
+  // what "saving" a generated video means).
+  const session = {
+    user: null,
+    balance: 0,
+    costs: { story: 10, frame: 20, video: 120 },
+    anonymousRemaining: 3,
+    anonymousLimit: 3,
+  };
 
   const money = n => Number(n || 0).toLocaleString();
 
@@ -1084,14 +1094,21 @@
 
       nav.append(chip, name, signOut);
     } else {
+      const trial = session.anonymousRemaining > 0
+        ? `Free trial — ${session.anonymousRemaining} left`
+        : 'Trial used — sign in to keep going'
+      const chip = el('span', 'credit-chip', trial);
+      chip.title = 'New visitors get a few free generations. Sign in to save your film and earn 250 credits.';
+
       const signIn = el('a', 'nav-link', 'Sign in');
       signIn.href = '#';
       signIn.addEventListener('click', event => { event.preventDefault(); openAuth('login'); });
-      nav.append(signIn);
+      nav.append(chip, signIn);
     }
 
     renderCostHint();
     renderShotActions();
+    renderSaveButton();
     renderPublishButton();
   }
 
@@ -1100,9 +1117,15 @@
     hint.replaceChildren();
 
     if (!session.user){
-      hint.append(document.createTextNode('Sign in to generate — new accounts open with '));
-      hint.append(el('b', null, '250 free credits'));
-      hint.append(document.createTextNode('.'));
+      if (session.anonymousRemaining > 0){
+        hint.append(document.createTextNode('Free trial — '));
+        hint.append(el('b', null, `${session.anonymousRemaining} generation${session.anonymousRemaining === 1 ? '' : 's'} left`));
+        hint.append(document.createTextNode('. Sign in to save your film and get 250 credits.'));
+      } else {
+        hint.append(document.createTextNode('Your free trial is used up. '));
+        hint.append(el('b', null, 'Sign in'));
+        hint.append(document.createTextNode(' to save your work and keep generating.'));
+      }
       return;
     }
 
@@ -1119,6 +1142,12 @@
       session.user = data.user;
       session.balance = data.balance || 0;
       if (data.costs) session.costs = data.costs;
+      if (typeof data.anonymousRemaining === 'number'){
+        session.anonymousRemaining = data.anonymousRemaining;
+      }
+      if (typeof data.anonymousLimit === 'number'){
+        session.anonymousLimit = data.anonymousLimit;
+      }
       updateCreditDisclaimer(Boolean(data.paymentsConfigured));
     } catch (error) {
       session.user = null;
@@ -1140,9 +1169,11 @@
     try { await requestJSON('/api/auth/logout', {}); } catch (error) {}
     session.user = null;
     session.balance = 0;
+    session.anonymousRemaining = session.anonymousLimit;
     renderSession();
     loadMarketplace();
     setStatus('Signed out.');
+    refreshSession();
   }
 
   /* ---------- auth dialog ---------- */
@@ -1206,11 +1237,20 @@
 
       session.user = data.user;
       session.balance = data.balance || 0;
+      // The trial is over once signed in; clear the remaining count so the hint
+      // and save button switch to the account-owned state.
+      session.anonymousRemaining = session.anonymousLimit;
       renderSession();
       closeAuth();
       authForm.reset();
-      setStatus(`Signed in as ${data.user.displayName || data.user.email}.`);
+      const claimed = data.projectsClaimed || 0;
+      setStatus(`Signed in as ${data.user.displayName || data.user.email}.` + (claimed ? ` ${claimed} film${claimed === 1 ? '' : 's'} saved to your account.` : ''));
       loadMarketplace();
+      // If a trial film was open in the workspace, reload it so it is now owned
+      // by the account (the save button hides, render/publish unlock properly).
+      if (state.project){
+        await openProject(state.project.id);
+      }
     } catch (error) {
       authMsg.textContent = error.message;
     } finally {
@@ -1285,7 +1325,21 @@
         setStatus('Set a new password to finish recovering your account.');
       } else if (result.type === 'confirmation' || result.type === 'oauth'){
         await refreshSession();
-        setStatus('Signed in. Welcome to CinePay.');
+        // OAuth/confirmation land through Identity directly, so claim any trial
+        // work here the same way email/password sign-in does.
+        try {
+          const claimed = await requestJSON('/api/claim-anonymous', {});
+          if (claimed.projectsClaimed){
+            setStatus(`Signed in. ${claimed.projectsClaimed} film${claimed.projectsClaimed === 1 ? '' : 's'} saved to your account.`);
+            if (claimed.balance != null) setBalance(claimed.balance);
+          } else {
+            setStatus('Signed in. Welcome to CinePay.');
+          }
+        } catch {
+          setStatus('Signed in. Welcome to CinePay.');
+        }
+        await refreshSession();
+        if (state.project){ await openProject(state.project.id); }
         loadMarketplace();
       }
     } catch (error) {
@@ -1563,7 +1617,7 @@
   }
 
   function ownsProject(){
-    return Boolean(state.project && session.user && state.project.ownerId === session.user.id);
+    return Boolean(state.project) && state.ownsLoaded;
   }
 
   /* ---------- video renders ---------- */
@@ -1594,11 +1648,12 @@
     }
 
     const rendering = shot.renderStatus === 'queued' || shot.renderStatus === 'running';
-    button.textContent = `${shot.clipKey ? 'Render again' : 'Render video'} — ${session.costs.video} credits`;
+    button.textContent = session.user
+      ? `${shot.clipKey ? 'Render again' : 'Render video'} — ${session.costs.video} credits`
+      : `${shot.clipKey ? 'Render again' : 'Render video'} — free trial`;
     button.disabled = !ownsProject() || !shot.frameKey || rendering;
 
-    if (!session.user) note.textContent = 'Sign in to render this shot as video.';
-    else if (!ownsProject()) note.textContent = 'Only the director who generated this film can render it.';
+    if (!ownsProject()) note.textContent = 'Only the director who generated this film can render it.';
     else if (!shot.frameKey) note.textContent = 'Generate the still first — the clip is animated from it.';
     else if (rendering) note.textContent = 'Rendering in the background. This can take a few minutes; you can keep working.';
     else if (shot.renderError){ note.textContent = shot.renderError; note.classList.add('error'); }
@@ -1670,7 +1725,7 @@
     const project = state.project;
     const shot = currentShot();
     if (!project || !shot) return;
-    if (!session.user){ openAuth('login', 'Sign in to render video.'); return; }
+    if (!ownsProject()) return;
 
     const note = $('#renderNote');
     $('#renderShotBtn').disabled = true;
@@ -1695,11 +1750,32 @@
 
   /* ---------- publishing ---------- */
 
+  // The "save" button is the anonymous-trial call to action: signing in claims
+  // the project (and any rendered clip) into a real account so it persists.
+  const saveBtn = $('#saveBtn');
+  function renderSaveButton(){
+    // Only shown to an anonymous visitor who owns the open project. A signed-in
+    // director's work is already saved to their account.
+    if (!session.user && ownsProject()){
+      saveBtn.hidden = false;
+    } else {
+      saveBtn.hidden = true;
+    }
+  }
+  saveBtn.addEventListener('click', () => {
+    openAuth('signup', 'Create an account to save this film. Your story, stills, and rendered clips move with you.');
+  });
+
   function renderPublishButton(){
     const button = $('#publishBtn');
     const project = state.project;
 
     if (!ownsProject()){
+      button.hidden = true;
+      return;
+    }
+    // Publishing is an account-bound action; an anonymous visitor must save first.
+    if (!session.user){
       button.hidden = true;
       return;
     }
@@ -1734,10 +1810,13 @@
     }
   });
 
-  function loadProject(project){
+  function loadProject(project, opts){
     state.project = project;
     state.selected = project.shots[0]?.number || 1;
     state.overrides = {};
+    // A freshly generated project is owned by whoever generated it; a loaded one
+    // learns ownership from /api/story's isOwner flag.
+    state.ownsLoaded = opts?.owns ?? true;
 
     $('#wsTitle').textContent = project.title;
     $('#wsScene').textContent = `SCENE 1 · ${project.sceneHeading}`;
@@ -1750,6 +1829,7 @@
     renderScript(project);
     renderStoryboard(project);
     renderTimeline();
+    renderSaveButton();
     renderPublishButton();
     selectShot(state.selected);
     rememberProject(project);
@@ -1815,14 +1895,17 @@
     generateAllBtn.disabled = true;
     generateShotBtn.disabled = true;
     generateAllBtn.textContent = `Generating 0/${total}…`;
-    setStatus(`Generating ${total} storyboard frames — ${session.costs.frame} credits each…`);
+    setStatus(session.user
+      ? `Generating ${total} storyboard frames — ${session.costs.frame} credits each…`
+      : `Generating ${total} storyboard frames…`);
     setRail(3, 4);
 
     // Three at a time: fast enough to feel live, gentle on the image model.
     const workers = Array.from({ length: Math.min(3, total) }, async () => {
       while (queue.length){
         // The server is the authority on the balance; stop before it says no.
-        if (session.balance < session.costs.frame){
+        // Anonymous trial frames are free, so the balance gate does not apply.
+        if (session.user && session.balance < session.costs.frame){
           queue.length = 0;
           break;
         }
@@ -1903,8 +1986,8 @@
   async function openProject(id){
     setStatus('Loading project…');
     try {
-      const { project } = await requestJSON(`/api/story/${id}`);
-      loadProject(project);
+      const { project, isOwner } = await requestJSON(`/api/story/${id}`);
+      loadProject(project, { owns: Boolean(isOwner) });
       openWorkspace();
       setStatus(`“${project.title}” loaded.`);
       generateFrames(false);
@@ -1920,11 +2003,9 @@
   async function runBrief(brief, options){
     if (state.busy || !brief.trim()) return;
 
-    if (!session.user){
-      openAuth('signup', 'Create an account to generate a film — it opens with 250 free credits.');
-      return;
-    }
-
+    // Anonymous visitors can generate too — they just have a small free trial.
+    // The server enforces the limit; we only need to react when it says the
+    // trial is up.
     state.busy = true;
     composer.classList.add('busy');
     generateBtn.disabled = true;
@@ -1932,8 +2013,12 @@
     setRail(0, 1);
 
     try {
-      const { project, balance } = await requestJSON('/api/generate-story', { prompt: brief.trim(), mode: state.mode });
-      setBalance(balance);
+      const { project, balance, anonymousRemaining } = await requestJSON('/api/generate-story', { prompt: brief.trim(), mode: state.mode });
+      if (typeof balance === 'number') setBalance(balance);
+      if (typeof anonymousRemaining === 'number'){
+        session.anonymousRemaining = anonymousRemaining;
+        renderSession();
+      }
       setRail(3, 3);
       setStatus(`“${project.title}” — ${project.shots.length} shots boarded.`);
       if (options?.demoSlug){
@@ -1945,7 +2030,13 @@
       generateFrames(false);
     } catch (error) {
       if (error.status === 401){
-        openAuth('login', error.message);
+        if (error.data?.freeTrialExhausted){
+          openAuth('signup', 'Your free trial is used up. Create an account to save this film and keep generating.');
+          session.anonymousRemaining = 0;
+          renderSession();
+        } else {
+          openAuth('login', error.message);
+        }
         setStatus('');
       } else {
         setStatus(error.message || 'Story generation failed. Try again.', true);

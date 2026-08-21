@@ -2,7 +2,11 @@ import type { Config, Context } from '@netlify/functions'
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '../../db/index.js'
 import { renderJobs } from '../../db/schema.js'
-import { currentUser, unauthorized } from '../lib/auth.mts'
+import {
+  currentUser,
+  readAnonymousSession,
+  unauthorized,
+} from '../lib/auth.mts'
 import { CREDIT_COSTS, InsufficientCreditsError, grant, spend } from '../lib/credits.mts'
 import { loadProject } from '../lib/projects.mts'
 import { activeProvider } from '../lib/video.mts'
@@ -11,12 +15,18 @@ import { checkRateLimit, sweepRateBuckets } from '../lib/rate-limit.mts'
 /**
  * Queues a clip. The provider call itself happens in the background function,
  * because a render outlives the 60 seconds a synchronous function gets.
+ *
+ * A signed-in director pays credits; an anonymous visitor renders for free as
+ * part of their trial (the allowance is bounded by the story-generation limit,
+ * since every render hangs off a project the trial already paid for).
  */
 export default async (req: Request, context: Context) => {
   const user = await currentUser()
-  if (!user) return unauthorized('Sign in to render video.')
+  const anonymousSession = await readAnonymousSession(context)
 
-  const limited = await checkRateLimit(req, 'video', user.identityId)
+  if (!user && !anonymousSession) return unauthorized('Sign in to render video.')
+
+  const limited = await checkRateLimit(req, 'video', user?.identityId ?? null)
   if (limited) return limited
   void sweepRateBuckets()
 
@@ -35,7 +45,12 @@ export default async (req: Request, context: Context) => {
 
   const project = await loadProject(projectId)
   if (!project) return Response.json({ error: 'Unknown project.' }, { status: 404 })
-  if (project.ownerId !== user.id) {
+
+  const ownsAsUser = Boolean(user && project.ownerId === user.id)
+  const ownsAsAnon = Boolean(
+    anonymousSession && project.anonymousSessionId === anonymousSession.id,
+  )
+  if (!ownsAsUser && !ownsAsAnon) {
     return Response.json({ error: 'That project belongs to another director.' }, { status: 403 })
   }
 
@@ -78,39 +93,43 @@ export default async (req: Request, context: Context) => {
     return Response.json({ jobId: existing.id, status: existing.status, reused: true })
   }
 
-  let balance: number
-  try {
-    balance = await spend(
-      user.id,
-      CREDIT_COSTS.video,
-      'video',
-      `Video clip — shot ${shotNumber}`,
-      projectId,
-    )
-  } catch (error) {
-    if (error instanceof InsufficientCreditsError) {
-      return Response.json(
-        {
-          error: `That costs ${error.required} credits and you have ${error.balance}.`,
-          insufficientCredits: true,
-          required: error.required,
-          balance: error.balance,
-        },
-        { status: 402 },
+  let balance: number | null = null
+  if (user) {
+    try {
+      balance = await spend(
+        user.id,
+        CREDIT_COSTS.video,
+        'video',
+        `Video clip — shot ${shotNumber}`,
+        projectId,
       )
+    } catch (error) {
+      if (error instanceof InsufficientCreditsError) {
+        return Response.json(
+          {
+            error: `That costs ${error.required} credits and you have ${error.balance}.`,
+            insufficientCredits: true,
+            required: error.required,
+            balance: error.balance,
+          },
+          { status: 402 },
+        )
+      }
+      throw error
     }
-    throw error
   }
 
   const [job] = await db
     .insert(renderJobs)
     .values({
       projectId,
-      userId: user.id,
+      userId: user?.id ?? null,
+      anonymousSessionId: anonymousSession?.id ?? null,
       shotNumber,
       status: 'queued',
       provider,
-      creditsHeld: CREDIT_COSTS.video,
+      // Anonymous renders hold no credits, so nothing is held against a refund.
+      creditsHeld: user ? CREDIT_COSTS.video : 0,
     })
     // render_jobs_open_shot_key admits one unfinished job per shot, so a second
     // request that slipped past the check above inserts nothing and is refunded.
@@ -118,13 +137,15 @@ export default async (req: Request, context: Context) => {
     .returning({ id: renderJobs.id })
 
   if (!job) {
-    const refunded = await grant(
-      user.id,
-      CREDIT_COSTS.video,
-      'refund',
-      'Refund — this shot was already rendering',
-      projectId,
-    )
+    const refunded = user
+      ? await grant(
+          user.id,
+          CREDIT_COSTS.video,
+          'refund',
+          'Refund — this shot was already rendering',
+          projectId,
+        )
+      : null
     const [open] = await db
       .select({ id: renderJobs.id, status: renderJobs.status })
       .from(renderJobs)
@@ -160,17 +181,20 @@ export default async (req: Request, context: Context) => {
       .update(renderJobs)
       .set({ status: 'failed', error: 'Could not start the render worker.' })
       .where(eq(renderJobs.id, job.id))
-    const refunded = await grant(
-      user.id,
-      CREDIT_COSTS.video,
-      'refund',
-      'Refund — render worker did not start',
-      job.id,
-    )
-    return Response.json(
-      { error: 'Could not start the render. Your credits were refunded.', balance: refunded },
-      { status: 502 },
-    )
+    if (user) {
+      const refunded = await grant(
+        user.id,
+        CREDIT_COSTS.video,
+        'refund',
+        'Refund — render worker did not start',
+        job.id,
+      )
+      return Response.json(
+        { error: 'Could not start the render. Your credits were refunded.', balance: refunded },
+        { status: 502 },
+      )
+    }
+    return Response.json({ error: 'Could not start the render.' }, { status: 502 })
   }
 
   return Response.json({ jobId: job.id, status: 'queued', provider, balance }, { status: 202 })
