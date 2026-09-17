@@ -31,6 +31,21 @@ export const users = pgTable(
   ],
 )
 
+export const userProjectUsage = pgTable(
+  'user_project_usage',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    anonId: text('anon_id'),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    projectCount: integer('project_count').default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index('user_project_usage_anon_id_idx').on(table.anonId),
+    index('user_project_usage_user_id_idx').on(table.userId),
+  ],
+)
+
 export const projects = pgTable(
   'projects',
   {

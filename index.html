@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script type="text/javascript" src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 <style>
   :root{
     --ink: #060708;
@@ -959,6 +960,23 @@
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+  function getOrCreateAnonId(){
+    let id = null;
+    try { id = localStorage.getItem('cinepay_anon_id'); } catch (e) {}
+    if (!id){
+      const match = document.cookie.match(/(?:^|; )cinepay_anon_id=([^;]*)/);
+      if (match) id = decodeURIComponent(match[1]);
+    }
+    if (!id){
+      id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : 'anon-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+    }
+    try { localStorage.setItem('cinepay_anon_id', id); } catch (e) {}
+    try { document.cookie = `cinepay_anon_id=${encodeURIComponent(id)}; path=/; max-age=31536000; SameSite=Lax`; } catch (e) {}
+    return id;
+  }
+
   const state = { project: null, selected: 1, mode: 'basic', busy: false, overrides: {} };
 
   function el(tag, className, text){
@@ -970,9 +988,10 @@
 
   async function requestJSON(url, body, method){
     const verb = method || (body ? 'POST' : 'GET');
-    const res = await fetch(url, verb === 'GET' ? undefined : {
+    const headers = { 'Content-Type': 'application/json', 'x-anon-id': getOrCreateAnonId() };
+    const res = await fetch(url, verb === 'GET' ? { headers } : {
       method: verb,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body || {}),
     });
     const data = await res.json().catch(() => ({}));
@@ -983,6 +1002,91 @@
       throw error;
     }
     return data;
+  }
+
+  /* ---------- Netlify Identity ---------- */
+
+  window.netlifyIdentity = window.netlifyIdentity || {
+    init: () => {},
+    on: () => {},
+    open: () => {},
+    close: () => {},
+    currentUser: () => null,
+  };
+  const netlifyIdentity = window.netlifyIdentity;
+
+  netlifyIdentity.init();
+  netlifyIdentity.on('login', user => { /* handle */ });
+  netlifyIdentity.on('error', err => console.error('Identity error:', err));
+  netlifyIdentity.on('login', user => { onIdentityLogin(user); });
+
+  let currentProjectCount = 0;
+
+  async function fetchProjectCount(){
+    try {
+      const data = await requestJSON('/api/project-usage');
+      if (typeof data.projectCount === 'number') {
+        currentProjectCount = data.projectCount;
+      }
+    } catch (e) {}
+    return currentProjectCount;
+  }
+
+  async function linkAnonUsage(){
+    const anonId = getOrCreateAnonId();
+    if (anonId && session.user){
+      try {
+        await requestJSON('/api/project-usage', { action: 'link', anonId });
+      } catch (e) {}
+    }
+  }
+
+  async function onIdentityLogin(user){
+    await refreshSession();
+    await linkAnonUsage();
+    if (sessionStorage.getItem('cinepay_gate_active') === 'true'){
+      redirectToCredits();
+    }
+  }
+
+  function redirectToSignup(){
+    sessionStorage.setItem('cinepay_gate_active', 'true');
+    try {
+      history.pushState({ page: 'signup' }, '', '/signup');
+    } catch (e) {}
+    if (typeof netlifyIdentity !== 'undefined' && typeof netlifyIdentity.open === 'function'){
+      try { netlifyIdentity.open('signup'); } catch (e) {}
+    }
+    openAuth('signup', 'Sign up to continue creating films. You have reached the 3-project demo limit.');
+    setStatus('Sign up to continue. Free limit of 3 preview projects reached.', true);
+  }
+
+  function redirectToCredits(){
+    closeAuth();
+    if (typeof netlifyIdentity !== 'undefined' && typeof netlifyIdentity.close === 'function'){
+      try { netlifyIdentity.close(); } catch (e) {}
+    }
+    try {
+      history.pushState({ page: 'credits' }, '', '/credits');
+    } catch (e) {}
+    const creditsSection = $('#creditsSection');
+    if (creditsSection){
+      creditsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+    setStatus('Welcome! Choose a demo credit pack below to top up.');
+  }
+
+  function returnToProjectCreation(){
+    sessionStorage.removeItem('cinepay_gate_active');
+    try {
+      history.pushState({ page: 'create' }, '', '/');
+    } catch (e) {}
+    closeWorkspace();
+    setTimeout(() => {
+      composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      briefInput.focus();
+      setStatus('Credits added! Continue creating your film.');
+    }, 600);
   }
 
   /* ---------- imagery ---------- */
@@ -1101,7 +1205,7 @@
     hint.replaceChildren();
 
     if (!session.user){
-      hint.append(document.createTextNode('Sign in to generate — new accounts open with '));
+      hint.append(document.createTextNode('3 free preview films before signup. New accounts open with '));
       hint.append(el('b', null, '250 free credits'));
       hint.append(document.createTextNode('.'));
       return;
@@ -1119,6 +1223,7 @@
       const data = await requestJSON('/api/me');
       session.user = data.user;
       session.balance = data.balance || 0;
+      if (typeof data.projectCount === 'number') currentProjectCount = data.projectCount;
       if (data.costs) session.costs = data.costs;
       updateCreditDisclaimer(Boolean(data.paymentsConfigured));
     } catch (error) {
@@ -1212,6 +1317,11 @@
       authForm.reset();
       setStatus(`Signed in as ${data.user.displayName || data.user.email}.`);
       loadMarketplace();
+      await linkAnonUsage();
+
+      if (sessionStorage.getItem('cinepay_gate_active') === 'true'){
+        redirectToCredits();
+      }
     } catch (error) {
       authMsg.textContent = error.message;
     } finally {
@@ -1286,8 +1396,12 @@
         setStatus('Set a new password to finish recovering your account.');
       } else if (result.type === 'confirmation' || result.type === 'oauth'){
         await refreshSession();
+        await linkAnonUsage();
         setStatus('Signed in. Welcome to CinePay.');
         loadMarketplace();
+        if (sessionStorage.getItem('cinepay_gate_active') === 'true'){
+          redirectToCredits();
+        }
       }
     } catch (error) {
       setStatus(error.message || 'Sign-in callback failed.', true);
@@ -1921,8 +2035,11 @@
   async function runBrief(brief, options){
     if (state.busy || !brief.trim()) return;
 
-    if (!session.user){
-      openAuth('signup', 'Create an account to generate a film — it opens with 250 free credits.');
+    const user = session.user;
+    const projectCount = await fetchProjectCount();
+
+    if (projectCount >= 3 && !user) {
+      redirectToSignup(); // then to credits page after successful signup
       return;
     }
 
@@ -1933,7 +2050,12 @@
     setRail(0, 1);
 
     try {
-      const { project, balance } = await requestJSON('/api/generate-story', { prompt: brief.trim(), mode: state.mode });
+      const { project, balance, projectCount: newCount } = await requestJSON('/api/generate-story', {
+        prompt: brief.trim(),
+        mode: state.mode,
+        anonId: getOrCreateAnonId(),
+      });
+      if (typeof newCount === 'number') currentProjectCount = newCount;
       setBalance(balance);
       setRail(3, 3);
       setStatus(`“${project.title}” — ${project.shots.length} shots boarded.`);
@@ -1945,7 +2067,10 @@
       openWorkspace();
       generateFrames(false);
     } catch (error) {
-      if (error.status === 401){
+      if (error.data?.requiresSignup || (error.status === 403 && !session.user)){
+        redirectToSignup();
+        setStatus('');
+      } else if (error.status === 401){
         openAuth('login', error.message);
         setStatus('');
       } else {
@@ -2169,6 +2294,7 @@
       }
       setBalance(data.balance);
       note.textContent = `${money(data.credits)} credits added. ${data.notice}`;
+      returnToProjectCreation();
     } catch (error) {
       note.textContent = error.message;
     } finally {
@@ -2186,6 +2312,16 @@
     });
   }));
 
+  function checkUrlRoute(){
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+    if (path === '/signup' || hash === '#signup'){
+      redirectToSignup();
+    } else if (path === '/credits' || hash === '#credits'){
+      redirectToCredits();
+    }
+  }
+
   renderRecents();
   renderControls();
   renderSession();
@@ -2194,6 +2330,8 @@
   loadMarketplace();
   loadIdentitySettings();
   processAuthCallback();
+  checkUrlRoute();
+  window.addEventListener('popstate', checkUrlRoute);
  </script>
 
 </body>

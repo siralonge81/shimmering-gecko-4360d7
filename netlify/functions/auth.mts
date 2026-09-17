@@ -2,6 +2,7 @@ import type { Config, Context } from '@netlify/functions'
 import { AuthError, getSettings, login, logout, signup, verifyRequestOrigin } from '@netlify/identity'
 import { currentUser } from '../lib/auth.mts'
 import { balanceFor } from '../lib/credits.mts'
+import { getAnonIdFromRequest, linkAnonToUser } from '../lib/usage.mts'
 
 /**
  * Auth runs server-side so the page stays a plain static document with no
@@ -41,7 +42,7 @@ export default async (req: Request, context: Context) => {
     return Response.json({ ok: true })
   }
 
-  let body: { email?: unknown; password?: unknown; name?: unknown }
+  let body: { email?: unknown; password?: unknown; name?: unknown; anonId?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -73,6 +74,11 @@ export default async (req: Request, context: Context) => {
     const user = await currentUser()
     if (!user) {
       return Response.json({ error: 'Signed in, but the session did not stick.' }, { status: 500 })
+    }
+
+    const anonId = getAnonIdFromRequest(req) || (typeof body.anonId === 'string' ? body.anonId.trim() : null)
+    if (anonId) {
+      await linkAnonToUser(anonId, user.id)
     }
 
     return Response.json({
