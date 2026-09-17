@@ -2,7 +2,7 @@ import type { Config, Context } from '@netlify/functions'
 import { currentUser, unauthorized } from '../lib/auth.mts'
 import { CREDIT_COSTS, InsufficientCreditsError, grant, spend } from '../lib/credits.mts'
 import { buildFramePrompt } from '../lib/film.mts'
-import { generateImage } from '../lib/images.mts'
+import { generateImage, isImageGenerationConfigured } from '../lib/images.mts'
 import { checkRateLimit, sweepRateBuckets } from '../lib/rate-limit.mts'
 import { loadProject, setFrameKey } from '../lib/projects.mts'
 import { FRAME_PREFIX, frameStore } from '../lib/stores.mts'
@@ -46,6 +46,13 @@ export default async (req: Request, _context: Context) => {
     camera: typeof body.camera === 'string' && body.camera ? body.camera : shot.camera,
     lighting: typeof body.lighting === 'string' && body.lighting ? body.lighting : shot.lighting,
     mood: typeof body.mood === 'string' && body.mood ? body.mood : shot.mood,
+  }
+
+  if (!isImageGenerationConfigured()) {
+    return Response.json(
+      { error: 'Frame generation requires Netlify AI Gateway enabled or OPENAI_API_KEY / GEMINI_API_KEY configured.' },
+      { status: 503 },
+    )
   }
 
   const ref = `${projectId}:${shotNumber}`

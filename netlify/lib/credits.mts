@@ -18,12 +18,14 @@ export const CREDIT_COSTS = {
 export type SpendReason = keyof typeof CREDIT_COSTS | 'signup_grant' | 'topup' | 'refund'
 
 export class InsufficientCreditsError extends Error {
-  constructor(
-    readonly required: number,
-    readonly balance: number,
-  ) {
+  readonly required: number
+  readonly balance: number
+
+  constructor(required: number, balance: number) {
     super(`Needs ${required} credits, balance is ${balance}.`)
     this.name = 'InsufficientCreditsError'
+    this.required = required
+    this.balance = balance
   }
 }
 

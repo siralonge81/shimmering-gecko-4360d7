@@ -90,6 +90,124 @@ const PLAN_TOOL: Anthropic.Tool = {
   },
 }
 
+function getEnv(key: string): string | undefined {
+  if (typeof Netlify !== 'undefined' && Netlify.env?.get) {
+    const val = Netlify.env.get(key)
+    if (val) return val
+  }
+  return process.env[key]
+}
+
+function isGatewayToken(key?: string): boolean {
+  return Boolean(key && key.startsWith('eyJ'))
+}
+
+function gatewayBase(): string | undefined {
+  const url = getEnv('NETLIFY_AI_GATEWAY_BASE_URL') || getEnv('ANTHROPIC_BASE_URL')
+  return url ? url.replace(/\/$/, '') : undefined
+}
+
+function gatewayKey(): string | undefined {
+  const key = getEnv('NETLIFY_AI_GATEWAY_KEY')
+  if (key) return key
+  const anthropic = getEnv('ANTHROPIC_API_KEY')
+  if (isGatewayToken(anthropic)) return anthropic
+  return undefined
+}
+
+export function isStoryGenerationConfigured(): boolean {
+  const hasGateway = Boolean(gatewayKey() && gatewayBase())
+  const manualKey = getEnv('ANTHROPIC_API_KEY')
+  const hasManualKey = Boolean(manualKey && !isGatewayToken(manualKey))
+  return hasGateway || hasManualKey
+}
+
+async function generateStoryPlan(
+  prompt: string,
+  mode: 'basic' | 'advanced',
+): Promise<Anthropic.Message> {
+  const attempts: { name: string; run: () => Promise<Anthropic.Message> }[] = []
+
+  const gwKey = gatewayKey()
+  const gwBase = gatewayBase()
+  const manualKey = getEnv('ANTHROPIC_API_KEY')
+  const manualBase = getEnv('ANTHROPIC_BASE_URL')
+
+  // Netlify AI Gateway
+  if (gwKey && gwBase) {
+    attempts.push({
+      name: 'Netlify AI Gateway (Claude)',
+      run: () => {
+        const anthropic = new Anthropic({
+          apiKey: gwKey,
+          baseURL: gwBase,
+        })
+        return anthropic.messages.create({
+          model: 'claude-sonnet-5',
+          max_tokens: 8000,
+          system: SYSTEM_PROMPT,
+          tools: [PLAN_TOOL],
+          tool_choice: { type: 'tool', name: PLAN_TOOL.name },
+          messages: [
+            {
+              role: 'user',
+              content: `Director's brief:\n${prompt}\n\n${MODE_GUIDANCE[mode]}`,
+            },
+          ],
+        })
+      },
+    })
+  }
+
+  // Manual ANTHROPIC_API_KEY
+  if (manualKey && !isGatewayToken(manualKey)) {
+    attempts.push({
+      name: 'Manual ANTHROPIC_API_KEY',
+      run: () => {
+        const anthropic = new Anthropic({
+          apiKey: manualKey,
+          baseURL: manualBase || undefined,
+        })
+        return anthropic.messages.create({
+          model: 'claude-sonnet-5',
+          max_tokens: 8000,
+          system: SYSTEM_PROMPT,
+          tools: [PLAN_TOOL],
+          tool_choice: { type: 'tool', name: PLAN_TOOL.name },
+          messages: [
+            {
+              role: 'user',
+              content: `Director's brief:\n${prompt}\n\n${MODE_GUIDANCE[mode]}`,
+            },
+          ],
+        })
+      },
+    })
+  }
+
+  if (attempts.length === 0) {
+    throw new Error(
+      'No story generation provider configured. Enable Netlify AI Gateway or configure ANTHROPIC_API_KEY.',
+    )
+  }
+
+  let lastError: unknown
+  for (const attempt of attempts) {
+    try {
+      return await attempt.run()
+    } catch (err) {
+      console.warn(`${attempt.name} story generation failed, falling back:`, err)
+      lastError = err
+    }
+  }
+
+  throw new Error(
+    `Story generation failed on all configured providers: ${
+      lastError instanceof Error ? lastError.message : String(lastError)
+    }`,
+  )
+}
+
 export default async (req: Request, _context: Context) => {
   const user = await currentUser()
   if (!user) return unauthorized('Sign in to generate a film.')
@@ -115,6 +233,13 @@ export default async (req: Request, _context: Context) => {
     return Response.json(
       { error: `Keep the brief under ${MAX_PROMPT_LENGTH} characters.` },
       { status: 400 },
+    )
+  }
+
+  if (!isStoryGenerationConfigured()) {
+    return Response.json(
+      { error: 'Story generation requires Netlify AI Gateway enabled or ANTHROPIC_API_KEY configured.' },
+      { status: 503 },
     )
   }
 
@@ -148,23 +273,7 @@ export default async (req: Request, _context: Context) => {
   }
 
   try {
-    const anthropic = new Anthropic({
-      apiKey: Netlify.env.get('ANTHROPIC_API_KEY') ?? Netlify.env.get('NETLIFY_AI_GATEWAY_KEY'),
-      baseURL: Netlify.env.get('ANTHROPIC_BASE_URL') ?? Netlify.env.get('NETLIFY_AI_GATEWAY_BASE_URL'),
-    })
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-5',
-      max_tokens: 8000,
-      system: SYSTEM_PROMPT,
-      tools: [PLAN_TOOL],
-      tool_choice: { type: 'tool', name: PLAN_TOOL.name },
-      messages: [
-        {
-          role: 'user',
-          content: `Director's brief:\n${prompt}\n\n${MODE_GUIDANCE[mode]}`,
-        },
-      ],
-    })
+    const message = await generateStoryPlan(prompt, mode)
 
     const toolUse = message.content.find((block) => block.type === 'tool_use')
     if (!toolUse || toolUse.type !== 'tool_use') {

@@ -19,9 +19,12 @@ export const RATE_LIMITS: Record<MeteredAction, { window: number; max: number }>
 }
 
 export class RateLimitError extends Error {
-  constructor(readonly retryAfterMs: number) {
+  readonly retryAfterMs: number
+
+  constructor(retryAfterMs: number) {
     super('Slow down — too many requests in a short window.')
     this.name = 'RateLimitError'
+    this.retryAfterMs = retryAfterMs
   }
 }
 
