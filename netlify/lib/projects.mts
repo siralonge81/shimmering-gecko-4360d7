@@ -4,10 +4,10 @@ import { projects, renderJobs, scenes, shots, votes } from '../../db/schema.js'
 import type { Dialogue, FilmProject, Scene, Shot } from './film.mts'
 
 /** Writes a freshly generated plan out across projects/scenes/shots. */
-export async function saveProject(userId: string, plan: FilmProject): Promise<void> {
+export async function saveProject(userId: string | null, plan: FilmProject): Promise<void> {
   await db.insert(projects).values({
     id: plan.id,
-    userId,
+    userId: userId ?? null,
     title: plan.title,
     logline: plan.logline,
     synopsis: plan.synopsis,

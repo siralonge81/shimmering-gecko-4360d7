@@ -5,6 +5,7 @@ import { CREDIT_COSTS, InsufficientCreditsError, grant, spend } from '../lib/cre
 import { normalizePlan } from '../lib/film.mts'
 import { checkRateLimit, sweepRateBuckets } from '../lib/rate-limit.mts'
 import { saveProject } from '../lib/projects.mts'
+import { getAnonIdFromRequest, getProjectCount, incrementProjectCount } from '../lib/usage.mts'
 
 const MAX_PROMPT_LENGTH = 1200
 
@@ -92,20 +93,37 @@ const PLAN_TOOL: Anthropic.Tool = {
 
 export default async (req: Request, _context: Context) => {
   const user = await currentUser()
-  if (!user) return unauthorized('Sign in to generate a film.')
+  let anonId = getAnonIdFromRequest(req)
 
-  // Meter before charging: an abusive caller should be refused before any
-  // model call or ledger write.
-  const limited = await checkRateLimit(req, 'story', user.identityId)
-  if (limited) return limited
-  void sweepRateBuckets()
-
-  let body: { prompt?: unknown; mode?: unknown }
+  let body: { prompt?: unknown; mode?: unknown; anonId?: unknown }
   try {
     body = await req.json()
   } catch {
     return Response.json({ error: 'Expected a JSON body.' }, { status: 400 })
   }
+
+  if (typeof body.anonId === 'string' && body.anonId.trim()) {
+    anonId = body.anonId.trim()
+  }
+
+  const projectCount = await getProjectCount(anonId, user?.id ?? null)
+
+  if (projectCount >= 3 && !user) {
+    return Response.json(
+      {
+        error: 'Project limit reached. Please sign up to continue.',
+        requiresSignup: true,
+        projectCount,
+      },
+      { status: 403 },
+    )
+  }
+
+  // Meter before charging: an abusive caller should be refused before any
+  // model call or ledger write.
+  const limited = await checkRateLimit(req, 'story', user?.identityId ?? null)
+  if (limited) return limited
+  void sweepRateBuckets()
 
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   if (!prompt) {
@@ -123,28 +141,30 @@ export default async (req: Request, _context: Context) => {
 
   // Charged up front so a balance cannot be spent twice by parallel requests;
   // refunded below if the model never delivers a plan.
-  let balance: number
-  try {
-    balance = await spend(
-      user.id,
-      CREDIT_COSTS.story,
-      'story',
-      `Story, script and shot list — ${mode}`,
-      projectId,
-    )
-  } catch (error) {
-    if (error instanceof InsufficientCreditsError) {
-      return Response.json(
-        {
-          error: `That costs ${error.required} credits and you have ${error.balance}.`,
-          insufficientCredits: true,
-          required: error.required,
-          balance: error.balance,
-        },
-        { status: 402 },
+  let balance = 0
+  if (user) {
+    try {
+      balance = await spend(
+        user.id,
+        CREDIT_COSTS.story,
+        'story',
+        `Story, script and shot list — ${mode}`,
+        projectId,
       )
+    } catch (error) {
+      if (error instanceof InsufficientCreditsError) {
+        return Response.json(
+          {
+            error: `That costs ${error.required} credits and you have ${error.balance}.`,
+            insufficientCredits: true,
+            required: error.required,
+            balance: error.balance,
+          },
+          { status: 402 },
+        )
+      }
+      throw error
     }
-    throw error
   }
 
   try {
@@ -181,20 +201,27 @@ export default async (req: Request, _context: Context) => {
       throw new Error('The story model returned no shots.')
     }
 
-    await saveProject(user.id, project)
+    await saveProject(user ? user.id : null, project)
+    const newCount = await incrementProjectCount(anonId, user ? user.id : null)
 
-    return Response.json({ project, balance })
+    return Response.json({ project, balance, projectCount: newCount })
   } catch (error) {
     console.error('generate-story failed:', error)
-    const refunded = await grant(
-      user.id,
-      CREDIT_COSTS.story,
-      'refund',
-      'Refund — story generation failed',
-      projectId,
-    )
+    if (user) {
+      const refunded = await grant(
+        user.id,
+        CREDIT_COSTS.story,
+        'refund',
+        'Refund — story generation failed',
+        projectId,
+      )
+      return Response.json(
+        { error: 'Story generation failed. Your credits were refunded.', balance: refunded },
+        { status: 502 },
+      )
+    }
     return Response.json(
-      { error: 'Story generation failed. Your credits were refunded.', balance: refunded },
+      { error: 'Story generation failed. Try again.' },
       { status: 502 },
     )
   }

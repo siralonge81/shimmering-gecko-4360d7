@@ -14,8 +14,14 @@
         "npm:@anthropic-ai/sdk@0.116",
         "npm:@google/genai@^2.17.1",
         "npm:@netlify/blobs@^10.7.13",
+        "npm:@netlify/database@^1.1.0",
         "npm:@netlify/functions@^5.3.0",
-        "npm:openai@^7.4.0"
+        "npm:@netlify/identity@^1.2.0",
+        "npm:drizzle-kit@^1.0.0-beta.22",
+        "npm:drizzle-orm@^1.0.0-beta.22",
+        "npm:openai@^7.4.0",
+        "npm:stripe@^22.5.0",
+        "npm:typescript@^7.0.2"
       ]
     }
   }
