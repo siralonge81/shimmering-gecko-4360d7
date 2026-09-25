@@ -1234,7 +1234,12 @@
 
   async function loadIdentitySettings(){
     try {
-      identitySettings = await requestJSON('/api/auth/settings');
+      // Read settings from the same origin that oauthLogin() targets. In deploy
+      // previews, a Function can resolve the production Identity context while
+      // the browser uses the preview origin, which makes disabled providers
+      // appear available and ends in an "Unsupported provider" response.
+      const { getSettings } = await import('@netlify/identity');
+      identitySettings = await getSettings();
     } catch { /* defaults */ }
     const providers = identitySettings.providers || {};
     const anyOAuth = Boolean(providers.google || providers.github);
@@ -1244,13 +1249,27 @@
     oauthGithub.hidden = !providers.github;
   }
 
-  function oauthLogin(provider){
+  async function oauthLogin(provider){
     // The Identity library redirects away; we import lazily so the static page
     // does not depend on the runtime at parse time.
-    import('@netlify/identity').then(({ oauthLogin }) => {
-      try { oauthLogin(provider); }
-      catch (error) { authMsg.textContent = 'Could not start ' + provider + ' sign-in.'; }
-    });
+    authMsg.classList.remove('ok');
+    try {
+      const identity = await import('@netlify/identity');
+      const settings = await identity.getSettings();
+      identitySettings = settings;
+      if (settings.providers?.[provider] !== true){
+        await loadIdentitySettings();
+        authMsg.textContent = provider[0].toUpperCase() + provider.slice(1) + ' sign-in is not enabled. Use email and password instead.';
+        return;
+      }
+      identity.oauthLogin(provider);
+    } catch (error) {
+      // oauthLogin throws after assigning window.location; only surface an
+      // error when the browser did not begin navigating away.
+      if (!String(error?.message || '').includes('Redirecting to OAuth provider')){
+        authMsg.textContent = error?.message || 'Could not start ' + provider + ' sign-in.';
+      }
+    }
   }
 
   oauthGoogle?.addEventListener('click', () => oauthLogin('google'));
