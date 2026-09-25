@@ -5,6 +5,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>CinePay — Turn your idea into a movie</title>
+<script type="importmap">
+{
+  "imports": {
+    "@netlify/identity": "https://esm.sh/@netlify/identity@1.2.0?bundle"
+  }
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1244,13 +1251,19 @@
     oauthGithub.hidden = !providers.github;
   }
 
-  function oauthLogin(provider){
+  async function oauthLogin(provider){
     // The Identity library redirects away; we import lazily so the static page
     // does not depend on the runtime at parse time.
-    import('@netlify/identity').then(({ oauthLogin }) => {
-      try { oauthLogin(provider); }
-      catch (error) { authMsg.textContent = 'Could not start ' + provider + ' sign-in.'; }
-    });
+    authMsg.textContent = '';
+    try {
+      const identity = await import('@netlify/identity');
+      identity.oauthLogin(provider);
+    } catch (error) {
+      // A successful oauthLogin changes window.location and then throws a
+      // sentinel error. That is expected while the browser navigates away.
+      if (error?.message === 'Redirecting to OAuth provider') return;
+      authMsg.textContent = 'Could not start ' + provider + ' sign-in. Please try again.';
+    }
   }
 
   oauthGoogle?.addEventListener('click', () => oauthLogin('google'));
