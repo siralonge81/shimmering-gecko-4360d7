@@ -2005,7 +2005,7 @@
       } else {
         setStatus(error.message || 'Story generation failed. Try again.', true);
       }
-      if (error.data?.insufficientCredits) setBalance(error.data.balance);
+      if (typeof error.data?.balance === 'number') setBalance(error.data.balance);
       setRail(0, 0);
       state.busy = false;
     } finally {

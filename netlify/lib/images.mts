@@ -26,24 +26,8 @@ function toArrayBuffer(base64: string): ArrayBuffer {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
 }
 
-/**
- * Netlify normally injects per-provider credentials that the official SDKs pick
- * up on their own. When a provider's own variables are absent, the always-set
- * AI Gateway credentials reach the same models.
- */
-function gatewayBase(): string {
-  return (Netlify.env.get('NETLIFY_AI_GATEWAY_BASE_URL') ?? '').replace(/\/$/, '')
-}
-
-function gatewayKey(): string | undefined {
-  return Netlify.env.get('NETLIFY_AI_GATEWAY_KEY')
-}
-
 async function generateWithOpenAI(prompt: string): Promise<GeneratedImage> {
-  const openai = new OpenAI({
-    apiKey: Netlify.env.get('OPENAI_API_KEY') ?? gatewayKey(),
-    baseURL: Netlify.env.get('OPENAI_BASE_URL') ?? `${gatewayBase()}/v1`,
-  })
+  const openai = new OpenAI({ timeout: 30_000, maxRetries: 0 })
 
   const result = await openai.images.generate({
     model: 'gpt-image-1',
@@ -62,8 +46,11 @@ async function generateWithOpenAI(prompt: string): Promise<GeneratedImage> {
 
 async function generateWithGemini(prompt: string): Promise<GeneratedImage> {
   const ai = new GoogleGenAI({
-    apiKey: Netlify.env.get('GEMINI_API_KEY') ?? gatewayKey(),
-    httpOptions: { baseUrl: Netlify.env.get('GOOGLE_GEMINI_BASE_URL') ?? gatewayBase() },
+    apiKey: Netlify.env.get('NETLIFY_AI_GATEWAY_KEY'),
+    httpOptions: {
+      baseUrl: Netlify.env.get('NETLIFY_AI_GATEWAY_URL')?.replace(/\/$/, ''),
+      timeout: 20_000,
+    },
   })
 
   const response = await ai.models.generateContent({
