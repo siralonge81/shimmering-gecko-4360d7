@@ -149,11 +149,14 @@ export default async (req: Request, context: Context) => {
   // browser follows the job through /api/render/:jobId.
   const origin = new URL(req.url).origin
   try {
-    await fetch(`${origin}/.netlify/functions/render-run`, {
+    const worker = await fetch(`${origin}/.netlify/functions/render-run`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ jobId: job.id }),
     })
+    if (worker.status !== 202) {
+      throw new Error(`Render worker did not accept the job (${worker.status}).`)
+    }
   } catch (error) {
     console.error('Could not start the background render:', error)
     await db

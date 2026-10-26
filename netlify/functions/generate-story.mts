@@ -148,10 +148,8 @@ export default async (req: Request, _context: Context) => {
   }
 
   try {
-    const anthropic = new Anthropic({
-      apiKey: Netlify.env.get('ANTHROPIC_API_KEY') ?? Netlify.env.get('NETLIFY_AI_GATEWAY_KEY'),
-      baseURL: Netlify.env.get('ANTHROPIC_BASE_URL') ?? Netlify.env.get('NETLIFY_AI_GATEWAY_BASE_URL'),
-    })
+    // The SDK uses the provider credentials and URL injected by AI Gateway.
+    const anthropic = new Anthropic({ timeout: 45_000, maxRetries: 0 })
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-5',
       max_tokens: 8000,
