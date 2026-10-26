@@ -1098,6 +1098,7 @@
     }
 
     renderCostHint();
+    renderFrameActions();
     renderShotActions();
     renderPublishButton();
   }
@@ -1117,7 +1118,7 @@
     hint.append(el('b', null, `${session.costs.story} credits`));
     hint.append(document.createTextNode(`, each still ${session.costs.frame}, each video clip ${session.costs.video}. Balance `));
     hint.append(el('b', null, money(session.balance)));
-    hint.append(document.createTextNode('.'));
+    hint.append(document.createTextNode('. Automatic storyboard images keep enough credits for one video clip.'));
   }
 
   async function refreshSession(){
@@ -1778,6 +1779,7 @@
     renderTimeline();
     renderPublishButton();
     selectShot(state.selected);
+    renderFrameActions();
     rememberProject(project);
 
     // A clip queued in an earlier visit may still be running.
@@ -1790,6 +1792,21 @@
 
   const generateAllBtn = $('#generateAllBtn');
   const generateShotBtn = $('#generateShotBtn');
+
+  function renderFrameActions(){
+    const project = state.project;
+    if (!project) return;
+    const missing = project.shots.filter(shot => !shot.frameKey).length;
+    const affordable = Math.min(missing, Math.floor(session.balance / session.costs.frame));
+    if (!state.busy){
+      generateAllBtn.textContent = affordable
+        ? `Generate ${affordable} missing shots — ${affordable * session.costs.frame} credits`
+        : 'No missing shots within budget';
+      generateAllBtn.disabled = !ownsProject() || affordable === 0;
+      generateShotBtn.textContent = `Generate shot — ${session.costs.frame} credits`;
+      generateShotBtn.disabled = !ownsProject() || session.balance < session.costs.frame;
+    }
+  }
 
   async function generateFrame(number, overrides){
     const project = state.project;
@@ -1826,14 +1843,24 @@
     }
   }
 
-  async function generateFrames(force){
+  async function generateFrames(automatic = false){
     const project = state.project;
     if (!project || state.busy || !ownsProject()) return;
 
-    const queue = project.shots
-      .filter(shot => force || !shot.frameKey)
-      .map(shot => shot.number);
-    if (!queue.length) return;
+    const missing = project.shots.filter(shot => !shot.frameKey);
+    if (!missing.length) return;
+    // Fix the batch size before starting parallel calls: each pending request
+    // already owns part of this budget, even before its balance comes back.
+    const reserve = automatic ? session.costs.video : 0;
+    const affordable = Math.max(0, Math.floor((session.balance - reserve) / session.costs.frame));
+    const queue = missing.slice(0, affordable).map(shot => shot.number);
+    if (!queue.length){
+      setStatus(automatic
+        ? `Automatic images paused to keep credits for video. Generate individual shots or choose a batch to spend more.`
+        : `A still costs ${session.costs.frame} credits. Your balance is ${session.balance}.`);
+      renderFrameActions();
+      return;
+    }
 
     const total = queue.length;
     let done = 0;
@@ -1847,12 +1874,8 @@
     // Three at a time: fast enough to feel live, gentle on the image model.
     const workers = Array.from({ length: Math.min(3, total) }, async () => {
       while (queue.length){
-        // The server is the authority on the balance; stop before it says no.
-        if (session.balance < session.costs.frame){
-          queue.length = 0;
-          break;
-        }
-        await generateFrame(queue.shift());
+        const succeeded = await generateFrame(queue.shift());
+        if (!succeeded) queue.length = 0;
         done += 1;
         generateAllBtn.textContent = `Generating ${done}/${total}…`;
       }
@@ -1863,20 +1886,27 @@
     state.busy = false;
     generateAllBtn.disabled = false;
     generateShotBtn.disabled = false;
-    generateAllBtn.textContent = 'Generate all shots';
+    renderFrameActions();
     const boarded = project.shots.filter(shot => shot.frameKey).length;
-    setStatus(boarded === project.shots.length
-      ? `“${project.title}” — storyboard complete.`
-      : `“${project.title}” — ${boarded} of ${project.shots.length} shots boarded. Add credits to finish.`);
+    const remaining = project.shots.length - boarded;
+    setStatus(`“${project.title}” — ${boarded} of ${project.shots.length} shots boarded. ` +
+      (automatic ? `Automatic images keep ${reserve} credits for a video clip. ` : '') +
+      (remaining ? `Generate more images when you're ready; each costs ${session.costs.frame} credits.` : 'Storyboard complete.'));
     setRail(4, 5);
   }
 
-  generateAllBtn.addEventListener('click', () => generateFrames(true));
+  generateAllBtn.addEventListener('click', () => generateFrames(false));
   generateShotBtn.addEventListener('click', async () => {
     if (!state.project || state.busy) return;
+    state.busy = true;
+    generateAllBtn.disabled = true;
     generateShotBtn.disabled = true;
-    await generateFrame(state.selected, state.overrides);
-    generateShotBtn.disabled = false;
+    try {
+      await generateFrame(state.selected, state.overrides);
+    } finally {
+      state.busy = false;
+      renderFrameActions();
+    }
   });
 
   /* ---------- recent projects ---------- */
@@ -1932,8 +1962,7 @@
       const { project } = await requestJSON(`/api/story/${id}`);
       loadProject(project);
       openWorkspace();
-      setStatus(`“${project.title}” loaded.`);
-      generateFrames(false);
+      setStatus(`“${project.title}” loaded. Generating images or video spends credits only when you choose it.`);
       return true;
     } catch (error) {
       setStatus('That project could not be loaded.', true);
@@ -1968,7 +1997,7 @@
       state.busy = false;
       loadProject(project);
       openWorkspace();
-      generateFrames(false);
+      generateFrames(true);
     } catch (error) {
       if (error.status === 401){
         openAuth('login', error.message);
