@@ -224,7 +224,7 @@ export default async (req: Request, _context: Context) => {
     }
     return Response.json(
       {
-        error: `Story generation failed (${reason}). Your credits were refunded.`,
+           error: `Story generation failed (${reason}): ${String((error as Error)?.message ?? error).slice(0, 600)} — Your credits were refunded.`,
         reason,
         refundStatus: 'refunded',
         balance: refunded,
