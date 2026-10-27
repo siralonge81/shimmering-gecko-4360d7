@@ -46,7 +46,18 @@ const num = (value: unknown, fallback: number, min: number, max: number): number
   return Math.min(max, Math.max(min, Math.round(parsed)))
 }
 
-const arr = (value: unknown): unknown[] => (Array.isArray(value) ? value : [])
+const arr = (value: unknown): unknown[] => {
+  // Models sometimes send an array field as a JSON string; accept both.
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return Array.isArray(value) ? value : []
+}
 
 /**
  * The model is asked for this shape via a forced tool call, but a film plan is
