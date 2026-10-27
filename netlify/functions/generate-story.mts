@@ -157,11 +157,11 @@ export default async (req: Request, _context: Context) => {
       max_tokens: 4500,
       system: SYSTEM_PROMPT,
       tools: [PLAN_TOOL],
-      tool_choice: { type: 'tool', name: PLAN_TOOL.name },
+            tool_choice: { type: 'auto' },
       messages: [
         {
           role: 'user',
-          content: `Director's brief:\n${prompt}\n\n${MODE_GUIDANCE[mode]}`,
+                    content: `Director's brief:\n${prompt}\n\n${MODE_GUIDANCE[mode]}\n\nRespond only by calling the deliver_film_plan tool with the complete package.`,
         },
       ],
     })
