@@ -147,12 +147,14 @@ export default async (req: Request, _context: Context) => {
     throw error
   }
 
+  let reason = 'MODEL_ERROR'
   try {
     // The SDK uses the provider credentials and URL injected by AI Gateway.
-    const anthropic = new Anthropic({ timeout: 45_000, maxRetries: 0 })
+    // Netlify synchronous functions allow 60s; leave time for persistence/refunds.
+    const anthropic = new Anthropic({ timeout: 55_000, maxRetries: 0 })
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-5',
-      max_tokens: 8000,
+      model: 'claude-sonnet-5-5',
+      max_tokens: 4500,
       system: SYSTEM_PROMPT,
       tools: [PLAN_TOOL],
       tool_choice: { type: 'tool', name: PLAN_TOOL.name },
@@ -164,6 +166,11 @@ export default async (req: Request, _context: Context) => {
       ],
     })
 
+    reason = 'INVALID_PLAN'
+    if (message.stop_reason === 'max_tokens') {
+      reason = 'TOKEN_LIMIT'
+      throw new Error('The story model exceeded the output token limit.')
+    }
     const toolUse = message.content.find((block) => block.type === 'tool_use')
     if (!toolUse || toolUse.type !== 'tool_use') {
       throw new Error('The story model returned no tool call.')
@@ -179,20 +186,43 @@ export default async (req: Request, _context: Context) => {
       throw new Error('The story model returned no shots.')
     }
 
+    reason = 'SAVE_FAILED'
     await saveProject(user.id, project)
 
     return Response.json({ project, balance })
   } catch (error) {
-    console.error('generate-story failed:', error)
-    const refunded = await grant(
-      user.id,
-      CREDIT_COSTS.story,
-      'refund',
-      'Refund — story generation failed',
-      projectId,
-    )
+    if (error instanceof Anthropic.APIConnectionTimeoutError) reason = 'MODEL_TIMEOUT'
+    else if (error instanceof Anthropic.APIConnectionError) reason = 'MODEL_CONNECTION'
+    else if (error instanceof Anthropic.APIError) reason = `MODEL_HTTP_${error.status ?? 'ERROR'}`
+    console.error('generate-story failed:', { reason, projectId })
+    let refunded: number
+    try {
+      refunded = await grant(
+        user.id,
+        CREDIT_COSTS.story,
+        'refund',
+        'Refund — story generation failed',
+        projectId,
+      )
+    } catch {
+      console.error('generate-story refund failed:', { reason, projectId })
+      return Response.json(
+        {
+          error: `Story generation failed (${reason}). We could not confirm your credit refund. Contact support with reference ${projectId}.`,
+          reason,
+          refundStatus: 'unconfirmed',
+          reference: projectId,
+        },
+        { status: 502 },
+      )
+    }
     return Response.json(
-      { error: 'Story generation failed. Your credits were refunded.', balance: refunded },
+      {
+        error: `Story generation failed (${reason}). Your credits were refunded.`,
+        reason,
+        refundStatus: 'refunded',
+        balance: refunded,
+      },
       { status: 502 },
     )
   }
