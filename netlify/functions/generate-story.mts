@@ -46,7 +46,17 @@ const PLAN_TOOL: Anthropic.Tool = {
       duration_seconds: { type: 'number', description: 'Total running time in seconds.' },
       scenes: {
         type: 'array',
-        description: 'The scripted scene(s), in screenplay order.',
+        const arr = (value: unknown): unknown[] => {
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return Array.isArray(value) ? value : []
+}
         items: {
           type: 'object',
           properties: {
@@ -173,7 +183,8 @@ export default async (req: Request, _context: Context) => {
     }
     const toolUse = message.content.find((block) => block.type === 'tool_use')
     if (!toolUse || toolUse.type !== 'tool_use') {
-      throw new Error('The story model returned no tool call.')
+            const raw = toolUse.input as Record<string, unknown>
+      throw new Error(`The story model returned no shots. Keys: ${Object.keys(raw).join(',')}; shots is ${typeof raw.shots}; stop reason: ${message.stop_reason}`)
     }
 
     const project = normalizePlan(toolUse.input as Record<string, unknown>, {
