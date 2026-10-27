@@ -189,7 +189,7 @@ export default async (req: Request, _context: Context) => {
     reason = 'SAVE_FAILED'
     await saveProject(user.id, project)
 
-    return Response.json({ project, balance })
+        return Response.json({ project: { ...project, ownerId: user.id, published: false, voteCount: 0 }, balance })
   } catch (error) {
     if (error instanceof Anthropic.APIConnectionTimeoutError) reason = 'MODEL_TIMEOUT'
     else if (error instanceof Anthropic.APIConnectionError) reason = 'MODEL_CONNECTION'
